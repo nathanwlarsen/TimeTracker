@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import filedialog
 import pyperclip
 import pyautogui
 import pygetwindow
@@ -17,6 +18,7 @@ from ttkbootstrap.tooltip import ToolTip
 import zipfile
 from urllib.request import urlretrieve
 import filecmp
+import shutil
 
 # Global Variables
 message_box_shown = False
@@ -106,9 +108,6 @@ def read_config():
     except Exception as e:
         pass
 
-    set_position()
-    always_on_top()
-
 # Write to config file
 def write_config(index=None):
     config.read(config_file_path)
@@ -137,9 +136,23 @@ def write_config(index=None):
         'selected_sound': selected_sound.get(),
         'lunch_by_timer': lunch_by_timer.get(),
         'clock_out_timer': clock_out_timer.get(),
-        'font_size': font_size.get()
+        'font_size': font_size.get(),
     }
-    # print(selected_sound.get())
+    
+    if index == 'sound':
+        sound_var = custom_sound_name.get()
+        next_index = 1
+        
+        if 'Sounds' in config:
+            existing_indexes = [int(key.split('_')[1]) for key in config['Sounds'] if key.startswith('index_')]
+            if existing_indexes:
+                next_index = max(existing_indexes) + 1
+            config['Sounds'][f"index_{next_index}"] = sound_var
+        else:
+            config['Sounds'] = {
+                f"index_{next_index}": sound_var
+            }
+    
     # Write the values to the INI file
     with open(config_file_path, 'w') as configfile:
         config.write(configfile)
@@ -390,7 +403,11 @@ def message_box(title, message):
     canvas = tk.Canvas(window, highlightthickness=0)
     canvas.place(relwidth=1, relheight=1, anchor='nw')
     canvas.update_idletasks()  # Update to ensure accurate measurements
-    
+        
+    def on_close():
+        result.append(False)
+        top.destroy()
+        canvas.destroy()
 
     def on_ok():
         result.append(True)
@@ -428,6 +445,8 @@ def message_box(title, message):
     ok_button.pack(pady=10)
 
     top.focus_set()
+
+    top.protocol("WM_DELETE_WINDOW", on_close)
 
     top.transient(window)  # Associate the messagebox with the main window
     top.grab_set()  # Make the messagebox modal
@@ -547,6 +566,140 @@ def font_change(widget):
                 baby.configure(font=("Helvetica", font_size.get()))
     write_config()
 
+def custom_alarm():
+    custom_sound.set("")
+    selection.set("")
+    label_var.set("Click browse to add a sound")
+    # Create a semi-transparent canvas
+    canvas = tk.Canvas(window, highlightthickness=0)
+    canvas.place(relwidth=1, relheight=1, anchor='nw')
+    canvas.update_idletasks()  # Update to ensure accurate measurements
+    
+    def fetch_input(event):
+        sound = get_sound_name.get()
+        sound_name.set(sound)
+
+    def get_input():
+        selection.set(filedialog.askopenfilename(title="Select a .wav file", filetypes=[("WAV files", "*.wav")]))
+        if selection.get() != "":
+            if selection.get().lower().endswith(".wav"):
+                top.geometry(f"{width}x{height+50}+{x}+{y}")
+                label_var.set("Name the sound: ")
+                sound_name.set(os.path.basename(selection.get()[:-4]))
+                get_sound_name.configure(width=len(sound_name.get())+5)
+                get_sound_name.pack()
+            else:
+                label_var.set("Error: Selected file is not a .wav file.")
+        else:
+            label_var.set("No file selected.")
+
+    def on_close():
+        top.destroy()
+        canvas.destroy()
+
+    def on_select():
+        if sound_name.get() == "" or selection.get() == "":
+            message_box("Error", "You must enter a valid name.")
+            top.destroy()
+            canvas.destroy()
+            custom_alarm()
+        custom_sound_name.set(sound_name.get())
+        custom_sound.set(selection.get())
+        top.geometry(f"{width}x{height}+{x}+{y}")
+        get_sound_name.destroy()
+        select_button.destroy()
+        browse_button.destroy()
+        ok_button = ttk.Button(top, text="Ok", command=on_close)
+        ok_button.pack(pady=10, padx=10)
+        try:
+            script_directory = os.path.dirname(os.path.abspath(__file__))
+            sounds_folder = os.path.join(script_directory, 'alarm_sounds')
+            file_copy(custom_sound.get(),sounds_folder, custom_sound_name.get()+".wav")
+            label_var.set(value="Alarm Sound Added!")
+        except Exception as e:
+            message_box("Error", e)
+            label_var.set(value=f"Error: {e}")
+        selected_sound.set(custom_sound_name.get())
+        # write_config('sound')
+        get_sounds()
+        create_sound_menu_entries()
+
+    max_width = 400  # Set a maximum width for the message box
+    padding = 20     # Padding around the message text
+    
+    # Create a temporary label to calculate the height needed for the message
+    temp_label = ttk.Label(window, textvariable=label_var, wraplength=max_width - 2 * padding)
+    temp_label.update_idletasks()  # Update to ensure accurate measurements
+    required_height = temp_label.winfo_reqheight()
+
+    width = max_width
+    height = required_height + 2 * padding + 60  # Additional space for buttons and padding
+
+    # Calculate the position of the message box in relation to the main window
+    x_window = window.winfo_x()
+    y_window = window.winfo_y()
+    gui_width = window.winfo_width()
+    gui_height = window.winfo_height()
+
+    x = x_window + (gui_width - width) // 2
+    y = y_window + (gui_height - height) // 2
+
+    top = ttk.Toplevel(window)
+    top.title("Custom Sound")
+    top.geometry(f"{width}x{height}+{x}+{y}")
+
+    label = ttk.Label(top, textvariable=label_var, wraplength=width - 2 * padding)
+    label.pack(padx=padding, pady=padding, side=TOP)
+
+    browse_button = ttk.Button(top, text="Browse", command=get_input)
+    browse_button.pack(pady=10, padx=10, side="left")
+
+    select_button = ttk.Button(top, text="Select", command=on_select)
+    select_button.pack(pady=10, padx=10, side="right")
+
+    get_sound_name = ttk.Entry(top, textvariable=sound_name, justify='left')
+    get_sound_name.bind("<KeyRelease>", lambda event: fetch_input(event))
+
+    top.focus_set()
+
+    top.protocol("WM_DELETE_WINDOW", on_close)
+
+    top.transient(window)  # Associate the messagebox with the main window
+    top.grab_set()  # Make the messagebox modal
+    top.wait_window()  # Wait for the Toplevel window to be destroyed
+
+def create_sound_menu_entries():
+    config.read(config_file_path)
+    
+    for value in config['Sounds'].items():
+        key, value = value  # Unpack the tuple into key and value
+        # Check if the value is already added to the sound menu
+        if key not in added_keys:
+            added_keys.add(key)  # Add the value to the set of added values
+            sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=write_config)
+
+def file_copy(source, dest, name):
+    if os.path.isfile(source) and os.path.isdir(dest):
+        shutil.copy(source, os.path.join(dest, name))
+    else:
+        invalid_path = source if not os.path.isfile(source) else dest
+        message_box("Error", f"Invalid directory: {invalid_path}")
+
+def get_sounds():
+    config.read(config_file_path)
+    config['Sounds'] = {}
+    # Write the values to the INI file
+    with open(config_file_path, 'w') as configfile:
+        config.write(configfile)
+
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    sounds_folder = os.path.join(script_directory, 'alarm_sounds')
+    for file_name in os.listdir(sounds_folder):
+        if file_name.endswith('.wav'):
+            temp_name = file_name[:-4]
+            custom_sound_name.set(temp_name)
+            write_config('sound')
+
 # Create the main window
 window = ttk.Window(resizable=[False,False])
 window.title("Time Tracker")
@@ -574,7 +727,12 @@ window_mode = tk.StringVar(value="cosmo")
 lunch_by_timer = tk.BooleanVar()
 clock_out_timer = tk.BooleanVar()
 font_size = tk.IntVar(value=12)
-
+custom_sound = tk.StringVar()
+sound_name = tk.StringVar()
+custom_sound_name = tk.StringVar()
+label_var = tk.StringVar()
+selection = tk.StringVar()
+added_keys = set()
 # -------------------------------------------------------------------------------------------- #
 
 menu_bar = ttk.Menu(window)
@@ -597,13 +755,16 @@ alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", command=write
 
 sound_menu = ttk.Menu(alarm_menu, tearoff=0)
 alarm_menu.add_cascade(label="Sounds", menu=sound_menu)
-sound_menu.add_radiobutton(label="Never Gonna Give You Up", variable=selected_sound, value="rick", command=write_config)
-sound_menu.add_radiobutton(label="Alarm Tone", variable=selected_sound, value="alarm_tone", command=write_config)
-sound_menu.add_radiobutton(label="Retro", variable=selected_sound, value="retro_alarm", command=write_config)
-sound_menu.add_radiobutton(label="Digital", variable=selected_sound, value="digital", command=write_config)
-sound_menu.add_radiobutton(label="Vintage", variable=selected_sound, value="vintage", command=write_config)
-sound_menu.add_separator()
 sound_menu.add_radiobutton(label="Off (Silent)", variable=selected_sound, value="Off", command=write_config)
+sound_menu.add_separator()
+# sound_menu.add_radiobutton(label="Never Gonna Give You Up", variable=selected_sound, value="rick", command=write_config)
+# sound_menu.add_radiobutton(label="Alarm Tone", variable=selected_sound, value="alarm_tone", command=write_config)
+# sound_menu.add_radiobutton(label="Retro", variable=selected_sound, value="retro_alarm", command=write_config)
+# sound_menu.add_radiobutton(label="Digital", variable=selected_sound, value="digital", command=write_config)
+# sound_menu.add_radiobutton(label="Vintage", variable=selected_sound, value="vintage", command=write_config)
+# sound_menu.add_separator()
+sound_menu.add_command(label="Add Sound", command=custom_alarm)
+sound_menu.add_separator()
 
 window_menu = ttk.Menu(menu_bar, tearoff=0)
 theme_menu = ttk.Menu(window_menu, tearoff=0)
@@ -832,9 +993,7 @@ tooltip = ToolTip(lunch_time_label,"Time until '"'Lunch By'"'")
 if os.path.exists(config_file_path):
     read_config()
 
-update()
-update_time()
-font_change(window)
+window.after(0,update(), update_time(), font_change(window), set_position(), always_on_top(), get_sounds(), create_sound_menu_entries())
 
 # Run the GUI main loop
 window.mainloop()
