@@ -402,7 +402,7 @@ def message_box(title, message):
     result = tk.BooleanVar()
 
     # Create a semi-transparent canvas
-    canvas = tk.Canvas(window, highlightthickness=0)
+    canvas = ttk.Canvas(window, highlightthickness=0)
     canvas.place(relwidth=1, relheight=1, anchor='nw')
     canvas.update_idletasks()  # Update to ensure accurate measurements
         
@@ -726,7 +726,7 @@ def remove_sound(sound):
 
 def adjust_alpha():
     window.attributes("-alpha", alpha_value.get())
-print("hii")
+
 # Create the main window
 window = ttk.Window(resizable=[False,False], iconphoto=None)
 window.title("Time Tracker")
