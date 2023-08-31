@@ -15,16 +15,16 @@ import ttkbootstrap as ttk
 from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 from ttkbootstrap.tooltip import ToolTip
-import zipfile
-from urllib.request import urlretrieve
-import filecmp
 import shutil
+from urllib.request import urlretrieve
+import zipfile
+import filecmp
 
 # Global Variables
 message_box_shown = False
 lunch_message_box_shown = False
 # sound_file_path = pathlib.Path.home() / 'Desktop' /'Projects' / 'Python' / 'TimeTracker' /'rick.wav'
-sound_file_path = 'alarm_sounds/alarm.wav'
+# sound_file_path = 'alarm_sounds/alarm.wav'
 
 # Create a configparser object
 config = configparser.ConfigParser()
@@ -92,7 +92,7 @@ def read_config():
 
     menu_keys_to_set = [
         'lunch_by_timer','clock_out_timer','alarm_var', 'lunch_alarm_var', 'top_var', 'window_mode', 
-        'selected_sound', 'font_size'
+        'selected_sound', 'font_size', 'alpha_value'
         ]
 
     for key in menu_keys_to_set:
@@ -137,6 +137,7 @@ def write_config(index=None):
         'lunch_by_timer': lunch_by_timer.get(),
         'clock_out_timer': clock_out_timer.get(),
         'font_size': font_size.get(),
+        'alpha_value': alpha_value.get()
     }
     
     if index == 'sound':
@@ -397,7 +398,8 @@ def alarm_window():
         pygame.mixer.quit()
 
 def message_box(title, message):
-    result = []
+
+    result = tk.BooleanVar()
 
     # Create a semi-transparent canvas
     canvas = tk.Canvas(window, highlightthickness=0)
@@ -405,12 +407,12 @@ def message_box(title, message):
     canvas.update_idletasks()  # Update to ensure accurate measurements
         
     def on_close():
-        result.append(False)
+        result.set(False)
         top.destroy()
         canvas.destroy()
 
     def on_ok():
-        result.append(True)
+        result.set(True)
         top.destroy()
         canvas.destroy()
 
@@ -545,6 +547,7 @@ def highlight_entry(entry):
 
 def window_mode_toggle():
     style.theme_use(themename=window_mode.get())
+    font_change(window)
     write_config()
 
 def update_app():
@@ -596,7 +599,7 @@ def custom_alarm():
     def on_close():
         top.destroy()
         canvas.destroy()
-
+    
     def on_select():
         if sound_name.get() == "" or selection.get() == "":
             message_box("Error", "You must enter a valid name.")
@@ -615,14 +618,13 @@ def custom_alarm():
             script_directory = os.path.dirname(os.path.abspath(__file__))
             sounds_folder = os.path.join(script_directory, 'alarm_sounds')
             file_copy(custom_sound.get(),sounds_folder, custom_sound_name.get()+".wav")
+            selected_sound.set(custom_sound_name.get())
+            get_sounds()
+            create_sound_menu_entries()
             label_var.set(value="Alarm Sound Added!")
         except Exception as e:
             message_box("Error", e)
             label_var.set(value=f"Error: {e}")
-        selected_sound.set(custom_sound_name.get())
-        # write_config('sound')
-        get_sounds()
-        create_sound_menu_entries()
 
     max_width = 400  # Set a maximum width for the message box
     padding = 20     # Padding around the message text
@@ -670,13 +672,17 @@ def custom_alarm():
 
 def create_sound_menu_entries():
     config.read(config_file_path)
-    
+
+    sound_menu.delete(4, "end")
+    remove_menu.delete(0, "end")
+
     for value in config['Sounds'].items():
         key, value = value  # Unpack the tuple into key and value
         # Check if the value is already added to the sound menu
-        if key not in added_keys:
-            added_keys.add(key)  # Add the value to the set of added values
-            sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=write_config)
+        # if key not in added_keys:
+            # added_keys.add(key)  # Add the value to the set of added values
+        sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=write_config)
+        remove_menu.add_command(label=value, command=lambda i=value:remove_sound(i))
 
 def file_copy(source, dest, name):
     if os.path.isfile(source) and os.path.isdir(dest):
@@ -688,9 +694,7 @@ def file_copy(source, dest, name):
 def get_sounds():
     config.read(config_file_path)
     config['Sounds'] = {}
-    # Write the values to the INI file
-    with open(config_file_path, 'w') as configfile:
-        config.write(configfile)
+    with open(config_file_path, 'w') as configfile: config.write(configfile)
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
     sounds_folder = os.path.join(script_directory, 'alarm_sounds')
@@ -700,8 +704,31 @@ def get_sounds():
             custom_sound_name.set(temp_name)
             write_config('sound')
 
+def remove_sound(sound):
+
+    result = message_box("Confirm", "This will also delete the file, are you sure?")
+
+    if result.get() is True:
+        pass
+    else:
+        return
+
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    sounds_folder = os.path.join(script_directory, 'alarm_sounds')
+    file_path = os.path.join(sounds_folder, sound+".wav")
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        get_sounds()
+        create_sound_menu_entries()
+    else:
+        print("The file does not exist")
+
+def adjust_alpha():
+    window.attributes("-alpha", alpha_value.get())
+print("hii")
 # Create the main window
-window = ttk.Window(resizable=[False,False])
+window = ttk.Window(resizable=[False,False], iconphoto=None)
 window.title("Time Tracker")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
 
@@ -733,6 +760,8 @@ custom_sound_name = tk.StringVar()
 label_var = tk.StringVar()
 selection = tk.StringVar()
 added_keys = set()
+alpha_value = tk.StringVar(value="0.9")
+
 # -------------------------------------------------------------------------------------------- #
 
 menu_bar = ttk.Menu(window)
@@ -757,23 +786,22 @@ sound_menu = ttk.Menu(alarm_menu, tearoff=0)
 alarm_menu.add_cascade(label="Sounds", menu=sound_menu)
 sound_menu.add_radiobutton(label="Off (Silent)", variable=selected_sound, value="Off", command=write_config)
 sound_menu.add_separator()
-# sound_menu.add_radiobutton(label="Never Gonna Give You Up", variable=selected_sound, value="rick", command=write_config)
-# sound_menu.add_radiobutton(label="Alarm Tone", variable=selected_sound, value="alarm_tone", command=write_config)
-# sound_menu.add_radiobutton(label="Retro", variable=selected_sound, value="retro_alarm", command=write_config)
-# sound_menu.add_radiobutton(label="Digital", variable=selected_sound, value="digital", command=write_config)
-# sound_menu.add_radiobutton(label="Vintage", variable=selected_sound, value="vintage", command=write_config)
-# sound_menu.add_separator()
 sound_menu.add_command(label="Add Sound", command=custom_alarm)
 sound_menu.add_separator()
+
+remove_menu = ttk.Menu(alarm_menu, tearoff=0)
+alarm_menu.add_cascade(label="Remove Sounds", menu=remove_menu)
 
 window_menu = ttk.Menu(menu_bar, tearoff=0)
 theme_menu = ttk.Menu(window_menu, tearoff=0)
 font_menu = ttk.Menu(window_menu, tearoff=0)
 light_themes = ttk.Menu(theme_menu, tearoff=0)
 dark_themes = ttk.Menu(theme_menu, tearoff=0)
+alpha_menu = ttk.Menu(window_menu, tearoff=0)
 menu_bar.add_cascade(label="Window", menu=window_menu)
 window_menu.add_cascade(label="Themes", menu=theme_menu)
 window_menu.add_cascade(label="Font Size", menu=font_menu)
+window_menu.add_cascade(label="Transparency", menu=alpha_menu)
 theme_menu.add_cascade(label="Light Themes", menu=light_themes)
 theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
@@ -803,6 +831,12 @@ font_menu.add_radiobutton(label="14", variable=font_size, value=14, command=lamb
 font_menu.add_radiobutton(label="16", variable=font_size, value=16, command=lambda i=window: font_change(i))
 font_menu.add_radiobutton(label="18", variable=font_size, value=18, command=lambda i=window: font_change(i))
 font_menu.add_radiobutton(label="20", variable=font_size, value=20, command=lambda i=window: font_change(i))
+alpha_menu.add_radiobutton(label="0.5", variable=alpha_value, value='0.5', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.6", variable=alpha_value, value='0.6', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.7", variable=alpha_value, value='0.7', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.8", variable=alpha_value, value='0.8', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.9", variable=alpha_value, value='0.9', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="1.0", variable=alpha_value, value='1.0', command=adjust_alpha)
 
 entries_menu = ttk.Menu(menu_bar, tearoff=0)
 highlight_menu = ttk.Menu(entries_menu, tearoff=0)
@@ -993,7 +1027,15 @@ tooltip = ToolTip(lunch_time_label,"Time until '"'Lunch By'"'")
 if os.path.exists(config_file_path):
     read_config()
 
-window.after(0,update(), update_time(), font_change(window), set_position(), always_on_top(), get_sounds(), create_sound_menu_entries())
+window.after(0,update(), 
+             update_time(), 
+             font_change(window), 
+             set_position(), 
+             always_on_top(), 
+             get_sounds(), 
+             create_sound_menu_entries(),
+             adjust_alpha()
+             )
 
 # Run the GUI main loop
 window.mainloop()
