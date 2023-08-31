@@ -16,9 +16,6 @@ from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 from ttkbootstrap.tooltip import ToolTip
 import shutil
-from urllib.request import urlretrieve
-import zipfile
-import filecmp
 
 # Global Variables
 message_box_shown = False
@@ -73,7 +70,10 @@ def read_config():
             value_parts = config.get('Times', key).split('|')
             if len(value_parts) > 1 and value_parts[1] != current_date:
                 display.state(['invalid'])
-        except IndexError:
+            elif len(value_parts) == 1:
+                display.state(['invalid'])
+        except Exception as e:
+            print(e)
             display.state(['invalid'])
 
     time_keys_to_set = [
@@ -109,38 +109,49 @@ def read_config():
         pass
 
 # Write to config file
-def write_config(index=None):
+def write_config(index, state=None):
+    # open config file
     config.read(config_file_path)
     current_date = datetime.today()
     current_date = str(current_date.date())
-    
     if index == 'clock_in_time':
-        config['Times']['clock_in_time'] = clock_in_time.get()+"|"+current_date
-    if index == 'clock_out_lunch_time':
-        config['Times']['clock_out_lunch_time'] = clock_out_lunch_time.get()+"|"+current_date
-    if index == 'clock_in_lunch_time':
-        config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()+"|"+current_date
-
-    config['Times']['clock_out_time'] = clock_out_time.get()
-    config['Times']['lunch_by_time'] = lunch_by_time.get()
-    config['Times']['add_time_1'] = add_time_1.get()
-    config['Times']['add_time_2'] = add_time_2.get()
-    config['Times']['time_out'] = time_out.get()
-    config['Times']['pto_check'] = str(pto_check.get())
-    config['Times']['min_lunch'] = minimum_lunch.get()
-    config['Menu'] = {
-        'alarm_var': str(alarm_var.get()),
-        'lunch_alarm_var': lunch_alarm_var.get(),
-        'top_var': str(top_var.get()),
-        'window_mode': window_mode.get(),
-        'selected_sound': selected_sound.get(),
-        'lunch_by_timer': lunch_by_timer.get(),
-        'clock_out_timer': clock_out_timer.get(),
-        'font_size': font_size.get(),
-        'alpha_value': alpha_value.get()
-    }
-    
-    if index == 'sound':
+        if state == 'invalid':
+            config['Times']['clock_in_time'] = clock_in_time.get()
+        else:
+            config['Times']['clock_in_time'] = clock_in_time.get()+"|"+current_date
+    elif index == 'clock_out_lunch_time':
+        if state == 'invalid':
+            config['Times']['clock_out_lunch_time'] = clock_out_lunch_time.get()
+        else:
+            config['Times']['clock_out_lunch_time'] = clock_out_lunch_time.get()+"|"+current_date
+    elif index == 'clock_in_lunch_time':
+        if state == 'invalid':
+            config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()
+        else:
+            config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()+"|"+current_date
+    elif index == 'times':
+        config['Times'] = {
+            'clock_out_time': clock_out_time.get(),
+            'lunch_by_time': lunch_by_time.get(),
+            'add_time_1': add_time_1.get(),
+            'add_time_2': add_time_2.get(),
+            'time_out': time_out.get(),
+            'pto_check': str(pto_check.get()),
+            'min_lunch': minimum_lunch.get()
+        }
+    elif index == 'menu':
+        config['Menu'] = {
+            'alarm_var': str(alarm_var.get()),
+            'lunch_alarm_var': lunch_alarm_var.get(),
+            'top_var': str(top_var.get()),
+            'window_mode': window_mode.get(),
+            'selected_sound': selected_sound.get(),
+            'lunch_by_timer': lunch_by_timer.get(),
+            'clock_out_timer': clock_out_timer.get(),
+            'font_size': font_size.get(),
+            'alpha_value': alpha_value.get()
+        }
+    elif index == 'sound':
         sound_var = custom_sound_name.get()
         next_index = 1
         
@@ -153,8 +164,7 @@ def write_config(index=None):
             config['Sounds'] = {
                 f"index_{next_index}": sound_var
             }
-    
-    # Write the values to the INI file
+    # write to config file
     with open(config_file_path, 'w') as configfile:
         config.write(configfile)
 
@@ -162,6 +172,7 @@ def write_config(index=None):
 def clear_add_times():
     add_time_1.set("12:00:00 PM")
     add_time_2.set("12:00:00 PM")
+    write_config('times')
     update()
 
 # Function to handle time update button click
@@ -229,10 +240,10 @@ def grab_text(index):
                 clock_in_2_time_display.state(['!invalid'])
             elif index == "add_time_1":
                 add_time_1.set(grabbed_time)
-                write_config()
+                write_config('times')
             elif index == "add_time_2":
                 add_time_2.set(grabbed_time)
-                write_config()
+                write_config('times')
 
             # Update times with new data
             update()
@@ -355,14 +366,14 @@ def handle_keypress(event, entry_id):
         if re.match(r"\d{1,2}:\d{2}:\d{2} [APM]+", time):
             add_time_1.set(format_time(time))
             update()
-            write_config()
+            write_config('times')
             window.update()
     elif entry_id == "Entry 5":
         time = add_time_2_display.get().strip()
         if re.match(r"\d{1,2}:\d{2}:\d{2} [APM]+", time):
             add_time_2.set(format_time(time))
             update()
-            write_config()
+            write_config('times')
             window.update()
 
 # Function to center window
@@ -531,24 +542,28 @@ def always_on_top():
         window.attributes("-topmost", 1)
     else:
         window.attributes("-topmost", 0)
-    write_config()
+    write_config('menu')
 
 def highlight_entry(entry):
     if entry == "Clock In":
         clock_in_time_display.state(['invalid'])
+        write_config('clock_in_time', 'invalid')
     elif entry == "Clock Out for Lunch":
         clock_out_1_time_display.state(['invalid'])
+        write_config('clock_out_lunch_time', 'invalid')
     elif entry == "Clock In from Lunch":
         clock_in_2_time_display.state(['invalid'])
+        write_config('clock_in_lunch_time', 'invalid')
     elif entry == "All":
         clock_in_time_display.state(['invalid'])
         clock_out_1_time_display.state(['invalid'])
         clock_in_2_time_display.state(['invalid'])
+        write_config('all', 'invalid')
 
 def window_mode_toggle():
     style.theme_use(themename=window_mode.get())
     font_change(window)
-    write_config()
+    write_config('menu')
 
 def update_app():
 
@@ -567,7 +582,7 @@ def font_change(widget):
             child.configure(font=("Helvetica", font_size.get()))
             for baby in child.winfo_children():
                 baby.configure(font=("Helvetica", font_size.get()))
-    write_config()
+    write_config('menu')
 
 def custom_alarm():
     custom_sound.set("")
@@ -681,7 +696,7 @@ def create_sound_menu_entries():
         # Check if the value is already added to the sound menu
         # if key not in added_keys:
             # added_keys.add(key)  # Add the value to the set of added values
-        sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=write_config)
+        sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=lambda i="menu": write_config(i))
         remove_menu.add_command(label=value, command=lambda i=value:remove_sound(i))
 
 def file_copy(source, dest, name):
@@ -700,8 +715,7 @@ def get_sounds():
     sounds_folder = os.path.join(script_directory, 'alarm_sounds')
     for file_name in os.listdir(sounds_folder):
         if file_name.endswith('.wav'):
-            temp_name = file_name[:-4]
-            custom_sound_name.set(temp_name)
+            custom_sound_name.set(file_name[:-4])
             write_config('sound')
 
 def remove_sound(sound):
@@ -726,6 +740,7 @@ def remove_sound(sound):
 
 def adjust_alpha():
     window.attributes("-alpha", alpha_value.get())
+    write_config('menu')
 
 # Create the main window
 window = ttk.Window(resizable=[False,False], iconphoto=None)
@@ -779,12 +794,12 @@ file_menu.add_command(label="Exit", command=window.quit)
 alarm_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Alarm", menu=alarm_menu)
 alarm_menu.add_command(label="Test Alarm", command=alarm_window)
-alarm_menu.add_checkbutton(label="Clock Out Alarm Toggle", command=write_config, variable=alarm_var)
-alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", command=write_config, variable=lunch_alarm_var)
+alarm_menu.add_checkbutton(label="Clock Out Alarm Toggle", variable=alarm_var, command=lambda i="menu": write_config(i))
+alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", variable=lunch_alarm_var, command=lambda i="menu": write_config(i))
 
 sound_menu = ttk.Menu(alarm_menu, tearoff=0)
 alarm_menu.add_cascade(label="Sounds", menu=sound_menu)
-sound_menu.add_radiobutton(label="Off (Silent)", variable=selected_sound, value="Off", command=write_config)
+sound_menu.add_radiobutton(label="Off (Silent)", variable=selected_sound, value="Off", command=lambda i="menu": write_config(i))
 sound_menu.add_separator()
 sound_menu.add_command(label="Add Sound", command=custom_alarm)
 sound_menu.add_separator()
@@ -850,8 +865,8 @@ highlight_menu.add_command(label="All", command=lambda i="All": highlight_entry(
 
 timers_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Timers", menu=timers_menu)
-timers_menu.add_checkbutton(label="Lunch By Timer", command=write_config, variable=lunch_by_timer)
-timers_menu.add_checkbutton(label="Clock Out Timer", command=write_config, variable=clock_out_timer)
+timers_menu.add_checkbutton(label="Lunch By Timer", variable=lunch_by_timer, command=lambda i="menu": write_config(i))
+timers_menu.add_checkbutton(label="Clock Out Timer", variable=clock_out_timer, command=lambda i="menu": write_config(i))
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -1014,7 +1029,7 @@ time_out_display.grid(row=4, column=3, padx=5, pady=5, sticky="ew")
 # Check box to opt for PTO instead of incrementing clock out time
 pto_check_label = ttk.Label(container_frame_3, text= "PTO", width=10, anchor='e')
 pto_check_label.grid(row=4, column=5, padx=5, pady=5, sticky="ew")
-pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=write_config)
+pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=lambda i="times": write_config(i))
 pto_check_box.grid(row=4, column=6, padx=5, pady=5, sticky="w")
 
 # # Tool tips
