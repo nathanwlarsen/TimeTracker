@@ -718,6 +718,16 @@ def get_sounds():
             custom_sound_name.set(file_name[:-4])
             write_config('sound')
 
+    sound_in_file = False
+    for item in config['Sounds'].items():
+        if selected_sound.get() == item[1]:
+            sound_in_file = True
+            break
+    if sound_in_file:
+        pass
+    else:
+        selected_sound.set('Rick')
+
 def remove_sound(sound):
 
     result = message_box("Confirm", "This will also delete the file, are you sure?")
@@ -1042,12 +1052,12 @@ tooltip = ToolTip(lunch_time_label,"Time until '"'Lunch By'"'")
 if os.path.exists(config_file_path):
     read_config()
 
-window.after(0,update(), 
-             update_time(), 
-             font_change(window), 
-             set_position(), 
-             always_on_top(), 
-             get_sounds(), 
+window.after(0,update(),
+             update_time(),
+             font_change(window),
+             set_position(),
+             always_on_top(),
+             get_sounds(),
              create_sound_menu_entries(),
              adjust_alpha()
              )
