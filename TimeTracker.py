@@ -15,16 +15,13 @@ import ttkbootstrap as ttk
 from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 from ttkbootstrap.tooltip import ToolTip
-import zipfile
-from urllib.request import urlretrieve
-import filecmp
 import shutil
 
 # Global Variables
 message_box_shown = False
 lunch_message_box_shown = False
 # sound_file_path = pathlib.Path.home() / 'Desktop' /'Projects' / 'Python' / 'TimeTracker' /'rick.wav'
-sound_file_path = 'alarm_sounds/alarm.wav'
+# sound_file_path = 'alarm_sounds/alarm.wav'
 
 # Create a configparser object
 config = configparser.ConfigParser()
@@ -73,7 +70,10 @@ def read_config():
             value_parts = config.get('Times', key).split('|')
             if len(value_parts) > 1 and value_parts[1] != current_date:
                 display.state(['invalid'])
-        except IndexError:
+            elif len(value_parts) == 1:
+                display.state(['invalid'])
+        except Exception as e:
+            print(e)
             display.state(['invalid'])
 
     time_keys_to_set = [
@@ -92,7 +92,7 @@ def read_config():
 
     menu_keys_to_set = [
         'lunch_by_timer','clock_out_timer','alarm_var', 'lunch_alarm_var', 'top_var', 'window_mode', 
-        'selected_sound', 'font_size'
+        'selected_sound', 'font_size', 'alpha_value'
         ]
 
     for key in menu_keys_to_set:
@@ -109,37 +109,49 @@ def read_config():
         pass
 
 # Write to config file
-def write_config(index=None):
+def write_config(index, state=None):
+    # open config file
     config.read(config_file_path)
     current_date = datetime.today()
     current_date = str(current_date.date())
-    
     if index == 'clock_in_time':
-        config['Times']['clock_in_time'] = clock_in_time.get()+"|"+current_date
-    if index == 'clock_out_lunch_time':
-        config['Times']['clock_out_lunch_time'] = clock_out_lunch_time.get()+"|"+current_date
-    if index == 'clock_in_lunch_time':
-        config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()+"|"+current_date
-
-    config['Times']['clock_out_time'] = clock_out_time.get()
-    config['Times']['lunch_by_time'] = lunch_by_time.get()
-    config['Times']['add_time_1'] = add_time_1.get()
-    config['Times']['add_time_2'] = add_time_2.get()
-    config['Times']['time_out'] = time_out.get()
-    config['Times']['pto_check'] = str(pto_check.get())
-    config['Times']['min_lunch'] = minimum_lunch.get()
-    config['Menu'] = {
-        'alarm_var': str(alarm_var.get()),
-        'lunch_alarm_var': lunch_alarm_var.get(),
-        'top_var': str(top_var.get()),
-        'window_mode': window_mode.get(),
-        'selected_sound': selected_sound.get(),
-        'lunch_by_timer': lunch_by_timer.get(),
-        'clock_out_timer': clock_out_timer.get(),
-        'font_size': font_size.get(),
-    }
-    
-    if index == 'sound':
+        if state == 'invalid':
+            config['Times']['clock_in_time'] = clock_in_time.get()
+        else:
+            config['Times']['clock_in_time'] = clock_in_time.get()+"|"+current_date
+    elif index == 'clock_out_lunch_time':
+        if state == 'invalid':
+            config['Times']['clock_out_lunch_time'] = clock_out_lunch_time.get()
+        else:
+            config['Times']['clock_out_lunch_time'] = clock_out_lunch_time.get()+"|"+current_date
+    elif index == 'clock_in_lunch_time':
+        if state == 'invalid':
+            config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()
+        else:
+            config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()+"|"+current_date
+    elif index == 'times':
+        config['Times'] = {
+            'clock_out_time': clock_out_time.get(),
+            'lunch_by_time': lunch_by_time.get(),
+            'add_time_1': add_time_1.get(),
+            'add_time_2': add_time_2.get(),
+            'time_out': time_out.get(),
+            'pto_check': str(pto_check.get()),
+            'min_lunch': minimum_lunch.get()
+        }
+    elif index == 'menu':
+        config['Menu'] = {
+            'alarm_var': str(alarm_var.get()),
+            'lunch_alarm_var': lunch_alarm_var.get(),
+            'top_var': str(top_var.get()),
+            'window_mode': window_mode.get(),
+            'selected_sound': selected_sound.get(),
+            'lunch_by_timer': lunch_by_timer.get(),
+            'clock_out_timer': clock_out_timer.get(),
+            'font_size': font_size.get(),
+            'alpha_value': alpha_value.get()
+        }
+    elif index == 'sound':
         sound_var = custom_sound_name.get()
         next_index = 1
         
@@ -152,8 +164,7 @@ def write_config(index=None):
             config['Sounds'] = {
                 f"index_{next_index}": sound_var
             }
-    
-    # Write the values to the INI file
+    # write to config file
     with open(config_file_path, 'w') as configfile:
         config.write(configfile)
 
@@ -161,6 +172,7 @@ def write_config(index=None):
 def clear_add_times():
     add_time_1.set("12:00:00 PM")
     add_time_2.set("12:00:00 PM")
+    write_config('times')
     update()
 
 # Function to handle time update button click
@@ -228,10 +240,10 @@ def grab_text(index):
                 clock_in_2_time_display.state(['!invalid'])
             elif index == "add_time_1":
                 add_time_1.set(grabbed_time)
-                write_config()
+                write_config('times')
             elif index == "add_time_2":
                 add_time_2.set(grabbed_time)
-                write_config()
+                write_config('times')
 
             # Update times with new data
             update()
@@ -354,14 +366,14 @@ def handle_keypress(event, entry_id):
         if re.match(r"\d{1,2}:\d{2}:\d{2} [APM]+", time):
             add_time_1.set(format_time(time))
             update()
-            write_config()
+            write_config('times')
             window.update()
     elif entry_id == "Entry 5":
         time = add_time_2_display.get().strip()
         if re.match(r"\d{1,2}:\d{2}:\d{2} [APM]+", time):
             add_time_2.set(format_time(time))
             update()
-            write_config()
+            write_config('times')
             window.update()
 
 # Function to center window
@@ -397,24 +409,27 @@ def alarm_window():
         pygame.mixer.quit()
 
 def message_box(title, message):
-    result = []
+
+    result = tk.BooleanVar()
 
     # Create a semi-transparent canvas
-    canvas = tk.Canvas(window, highlightthickness=0)
+    canvas = ttk.Canvas(window, highlightthickness=0)
     canvas.place(relwidth=1, relheight=1, anchor='nw')
     canvas.update_idletasks()  # Update to ensure accurate measurements
         
     def on_close():
-        result.append(False)
+        result.set(False)
         top.destroy()
         canvas.destroy()
 
     def on_ok():
-        result.append(True)
+        result.set(True)
         top.destroy()
         canvas.destroy()
 
-    max_width = 400  # Set a maximum width for the message box
+    size = float(font_size.get())
+
+    max_width = round(33.33 * size)  # Set a maximum width for the message box
     padding = 20     # Padding around the message text
 
     # Create a temporary label to calculate the height needed for the message
@@ -423,7 +438,7 @@ def message_box(title, message):
     required_height = temp_label.winfo_reqheight()
 
     width = max_width
-    height = required_height + 2 * padding + 60  # Additional space for buttons and padding
+    height = required_height + 2 * padding + 60 * round(0.075*size) # Additional space for buttons and padding
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -529,23 +544,28 @@ def always_on_top():
         window.attributes("-topmost", 1)
     else:
         window.attributes("-topmost", 0)
-    write_config()
+    write_config('menu')
 
 def highlight_entry(entry):
     if entry == "Clock In":
         clock_in_time_display.state(['invalid'])
+        write_config('clock_in_time', 'invalid')
     elif entry == "Clock Out for Lunch":
         clock_out_1_time_display.state(['invalid'])
+        write_config('clock_out_lunch_time', 'invalid')
     elif entry == "Clock In from Lunch":
         clock_in_2_time_display.state(['invalid'])
+        write_config('clock_in_lunch_time', 'invalid')
     elif entry == "All":
         clock_in_time_display.state(['invalid'])
         clock_out_1_time_display.state(['invalid'])
         clock_in_2_time_display.state(['invalid'])
+        write_config('all', 'invalid')
 
 def window_mode_toggle():
     style.theme_use(themename=window_mode.get())
-    write_config()
+    font_change(window)
+    write_config('menu')
 
 def update_app():
 
@@ -564,7 +584,7 @@ def font_change(widget):
             child.configure(font=("Helvetica", font_size.get()))
             for baby in child.winfo_children():
                 baby.configure(font=("Helvetica", font_size.get()))
-    write_config()
+    write_config('menu')
 
 def custom_alarm():
     custom_sound.set("")
@@ -576,17 +596,23 @@ def custom_alarm():
     canvas.update_idletasks()  # Update to ensure accurate measurements
     
     def fetch_input(event):
-        sound = get_sound_name.get()
-        sound_name.set(sound)
+        if event.keysym == 'Return':
+            # Call the on_select function
+            on_select()
+        else:
+            # Handle other key releases
+            # Your code for handling other key releases here
+            sound = get_sound_name.get()
+            sound_name.set(sound)
 
     def get_input():
         selection.set(filedialog.askopenfilename(title="Select a .wav file", filetypes=[("WAV files", "*.wav")]))
         if selection.get() != "":
             if selection.get().lower().endswith(".wav"):
-                top.geometry(f"{width}x{height+50}+{x}+{y}")
+                # top.geometry(f"{width}x{height+50}+{x}+{y}")
                 label_var.set("Name the sound: ")
                 sound_name.set(os.path.basename(selection.get()[:-4]))
-                get_sound_name.configure(width=len(sound_name.get())+5)
+                get_sound_name.configure(width= 30)
                 get_sound_name.pack()
             else:
                 label_var.set("Error: Selected file is not a .wav file.")
@@ -596,7 +622,7 @@ def custom_alarm():
     def on_close():
         top.destroy()
         canvas.destroy()
-
+    
     def on_select():
         if sound_name.get() == "" or selection.get() == "":
             message_box("Error", "You must enter a valid name.")
@@ -615,25 +641,21 @@ def custom_alarm():
             script_directory = os.path.dirname(os.path.abspath(__file__))
             sounds_folder = os.path.join(script_directory, 'alarm_sounds')
             file_copy(custom_sound.get(),sounds_folder, custom_sound_name.get()+".wav")
+            selected_sound.set(custom_sound_name.get())
+            get_sounds()
+            create_sound_menu_entries()
             label_var.set(value="Alarm Sound Added!")
+            frame.destroy()
         except Exception as e:
             message_box("Error", e)
             label_var.set(value=f"Error: {e}")
-        selected_sound.set(custom_sound_name.get())
-        # write_config('sound')
-        get_sounds()
-        create_sound_menu_entries()
 
-    max_width = 400  # Set a maximum width for the message box
     padding = 20     # Padding around the message text
     
-    # Create a temporary label to calculate the height needed for the message
-    temp_label = ttk.Label(window, textvariable=label_var, wraplength=max_width - 2 * padding)
-    temp_label.update_idletasks()  # Update to ensure accurate measurements
-    required_height = temp_label.winfo_reqheight()
+    size = float(font_size.get())
 
-    width = max_width
-    height = required_height + 2 * padding + 60  # Additional space for buttons and padding
+    width = round(33.33 * size)
+    height = round(12.5 * size)
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -648,14 +670,17 @@ def custom_alarm():
     top.title("Custom Sound")
     top.geometry(f"{width}x{height}+{x}+{y}")
 
+    frame = ttk.Frame(top)
+    frame.pack(anchor='center', side='bottom')
+
     label = ttk.Label(top, textvariable=label_var, wraplength=width - 2 * padding)
     label.pack(padx=padding, pady=padding, side=TOP)
 
-    browse_button = ttk.Button(top, text="Browse", command=get_input)
-    browse_button.pack(pady=10, padx=10, side="left")
+    browse_button = ttk.Button(frame, text="Browse", command=get_input)
+    browse_button.pack(pady=10, padx=10, side='left')
 
-    select_button = ttk.Button(top, text="Select", command=on_select)
-    select_button.pack(pady=10, padx=10, side="right")
+    select_button = ttk.Button(frame, text="Select", command=on_select)
+    select_button.pack(pady=10, padx=10, side='right')
 
     get_sound_name = ttk.Entry(top, textvariable=sound_name, justify='left')
     get_sound_name.bind("<KeyRelease>", lambda event: fetch_input(event))
@@ -666,17 +691,22 @@ def custom_alarm():
 
     top.transient(window)  # Associate the messagebox with the main window
     top.grab_set()  # Make the messagebox modal
+    font_change(top)
     top.wait_window()  # Wait for the Toplevel window to be destroyed
 
 def create_sound_menu_entries():
     config.read(config_file_path)
-    
+
+    sound_menu.delete(4, "end")
+    remove_menu.delete(0, "end")
+
     for value in config['Sounds'].items():
         key, value = value  # Unpack the tuple into key and value
         # Check if the value is already added to the sound menu
-        if key not in added_keys:
-            added_keys.add(key)  # Add the value to the set of added values
-            sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=write_config)
+        # if key not in added_keys:
+            # added_keys.add(key)  # Add the value to the set of added values
+        sound_menu.add_radiobutton(label=value, variable=selected_sound, value=value, command=lambda i="menu": write_config(i))
+        remove_menu.add_command(label=value, command=lambda i=value:remove_sound(i))
 
 def file_copy(source, dest, name):
     if os.path.isfile(source) and os.path.isdir(dest):
@@ -688,25 +718,94 @@ def file_copy(source, dest, name):
 def get_sounds():
     config.read(config_file_path)
     config['Sounds'] = {}
-    # Write the values to the INI file
-    with open(config_file_path, 'w') as configfile:
-        config.write(configfile)
+    with open(config_file_path, 'w') as configfile: config.write(configfile)
 
     script_directory = os.path.dirname(os.path.abspath(__file__))
     sounds_folder = os.path.join(script_directory, 'alarm_sounds')
     for file_name in os.listdir(sounds_folder):
         if file_name.endswith('.wav'):
-            temp_name = file_name[:-4]
-            custom_sound_name.set(temp_name)
+            custom_sound_name.set(file_name[:-4])
             write_config('sound')
 
+    sound_in_file = False
+    for item in config['Sounds'].items():
+        if selected_sound.get() == item[1]:
+            sound_in_file = True
+            break
+    if sound_in_file:
+        pass
+    else:
+        selected_sound.set('Rick')
+
+def remove_sound(sound):
+
+    result = message_box("Confirm", "This will also delete the file, are you sure?")
+
+    if result.get() is True:
+        pass
+    else:
+        return
+
+    script_directory = os.path.dirname(os.path.abspath(__file__))
+    sounds_folder = os.path.join(script_directory, 'alarm_sounds')
+    file_path = os.path.join(sounds_folder, sound+".wav")
+
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            get_sounds()
+            create_sound_menu_entries()
+            message_box('Success','Sound successfully removed')
+        except Exception as e:
+            message_box('Error', e)
+    else:
+        print("The file does not exist")
+
+def adjust_alpha():
+    window.attributes("-alpha", alpha_value.get())
+    write_config('menu')
+
+# Define the window zoom function
+def window_zoom(event):
+    global window_scale
+    if event.keysym == 'plus' or event.keysym == 'equal':
+        # Zoom in code here
+        current_font = font_size.get()
+        font_size.set(current_font+1)
+        font_change(window)
+        pass
+    elif event.keysym == 'minus':
+        # Zoom out code here
+        current_font = font_size.get()
+        font_size.set(current_font-1)
+        font_change(window)
+        pass
+
+def task_view():
+    print(task_view_toggle.get())
+    if task_view_toggle.get() == True:
+        task_pane.grid(row=0, sticky='w', padx=0, pady=[10,0])
+    else:
+        task_pane.grid_forget()
+
+def start_task():
+    task_name_entry.state(['readonly'])
+
+def stop_task():
+    task_name_entry.state(['!readonly'])
+
+def view_tasks():
+    task_name_entry.state(['invalid'])
+
 # Create the main window
-window = ttk.Window(resizable=[False,False])
-window.title("Time Tracker")
+window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
+window.bind("<Control-plus>", window_zoom)
+window.bind("<Control-equal>", window_zoom)
+window.bind("<Control-minus>", window_zoom)
 
 # Style
-style = Style(theme="cosmo")
+style = Style()
 
 # Create time variables with default values
 clock_in_time = tk.StringVar(value="8:00:00 AM")
@@ -733,6 +832,10 @@ custom_sound_name = tk.StringVar()
 label_var = tk.StringVar()
 selection = tk.StringVar()
 added_keys = set()
+alpha_value = tk.StringVar(value="0.95")
+task_view_toggle = tk.BooleanVar()
+task_name = tk.StringVar()
+
 # -------------------------------------------------------------------------------------------- #
 
 menu_bar = ttk.Menu(window)
@@ -744,36 +847,34 @@ file_menu.add_command(label="Open Configuration File", command=open_config)
 file_menu.add_command(label="Open configuration File Folder", command=open_configfolder)
 file_menu.add_checkbutton(label="Window Always On Top", variable=top_var, command=always_on_top)
 file_menu.add_separator()
-# file_menu.add_command(label="Check For Updates", command=update_app)
 file_menu.add_command(label="Exit", command=window.quit)
 
 alarm_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Alarm", menu=alarm_menu)
 alarm_menu.add_command(label="Test Alarm", command=alarm_window)
-alarm_menu.add_checkbutton(label="Clock Out Alarm Toggle", command=write_config, variable=alarm_var)
-alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", command=write_config, variable=lunch_alarm_var)
+alarm_menu.add_checkbutton(label="Clock Out Alarm Toggle", variable=alarm_var, command=lambda i="menu": write_config(i))
+alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", indicatoron=True, variable=lunch_alarm_var, command=lambda i="menu": write_config(i))
 
 sound_menu = ttk.Menu(alarm_menu, tearoff=0)
 alarm_menu.add_cascade(label="Sounds", menu=sound_menu)
-sound_menu.add_radiobutton(label="Off (Silent)", variable=selected_sound, value="Off", command=write_config)
+sound_menu.add_radiobutton(label="Off (Silent)", variable=selected_sound, value="Off", command=lambda i="menu": write_config(i))
 sound_menu.add_separator()
-# sound_menu.add_radiobutton(label="Never Gonna Give You Up", variable=selected_sound, value="rick", command=write_config)
-# sound_menu.add_radiobutton(label="Alarm Tone", variable=selected_sound, value="alarm_tone", command=write_config)
-# sound_menu.add_radiobutton(label="Retro", variable=selected_sound, value="retro_alarm", command=write_config)
-# sound_menu.add_radiobutton(label="Digital", variable=selected_sound, value="digital", command=write_config)
-# sound_menu.add_radiobutton(label="Vintage", variable=selected_sound, value="vintage", command=write_config)
-# sound_menu.add_separator()
 sound_menu.add_command(label="Add Sound", command=custom_alarm)
 sound_menu.add_separator()
+
+remove_menu = ttk.Menu(alarm_menu, tearoff=0)
+alarm_menu.add_cascade(label="Remove Sounds", menu=remove_menu)
 
 window_menu = ttk.Menu(menu_bar, tearoff=0)
 theme_menu = ttk.Menu(window_menu, tearoff=0)
 font_menu = ttk.Menu(window_menu, tearoff=0)
 light_themes = ttk.Menu(theme_menu, tearoff=0)
 dark_themes = ttk.Menu(theme_menu, tearoff=0)
+alpha_menu = ttk.Menu(window_menu, tearoff=0)
 menu_bar.add_cascade(label="Window", menu=window_menu)
 window_menu.add_cascade(label="Themes", menu=theme_menu)
 window_menu.add_cascade(label="Font Size", menu=font_menu)
+window_menu.add_cascade(label="Transparency", menu=alpha_menu)
 theme_menu.add_cascade(label="Light Themes", menu=light_themes)
 theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
@@ -803,6 +904,14 @@ font_menu.add_radiobutton(label="14", variable=font_size, value=14, command=lamb
 font_menu.add_radiobutton(label="16", variable=font_size, value=16, command=lambda i=window: font_change(i))
 font_menu.add_radiobutton(label="18", variable=font_size, value=18, command=lambda i=window: font_change(i))
 font_menu.add_radiobutton(label="20", variable=font_size, value=20, command=lambda i=window: font_change(i))
+alpha_menu.add_radiobutton(label="0.8", variable=alpha_value, value='0.8', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.825", variable=alpha_value, value='0.825', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.85", variable=alpha_value, value='0.85', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.9", variable=alpha_value, value='0.9', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.925", variable=alpha_value, value='0.925', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.95", variable=alpha_value, value='0.95', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.975", variable=alpha_value, value='0.975', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="1.0", variable=alpha_value, value='1.0', command=adjust_alpha)
 
 entries_menu = ttk.Menu(menu_bar, tearoff=0)
 highlight_menu = ttk.Menu(entries_menu, tearoff=0)
@@ -816,8 +925,25 @@ highlight_menu.add_command(label="All", command=lambda i="All": highlight_entry(
 
 timers_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Timers", menu=timers_menu)
-timers_menu.add_checkbutton(label="Lunch By Timer", command=write_config, variable=lunch_by_timer)
-timers_menu.add_checkbutton(label="Clock Out Timer", command=write_config, variable=clock_out_timer)
+timers_menu.add_checkbutton(label="Lunch By Timer", variable=lunch_by_timer, command=lambda i="menu": write_config(i))
+timers_menu.add_checkbutton(label="Clock Out Timer", variable=clock_out_timer, command=lambda i="menu": write_config(i))
+
+task_menu = ttk.Menu(menu_bar, tearoff=0)
+menu_bar.add_cascade(label="Tasks", menu=task_menu)
+task_menu.add_checkbutton(label="Toggle Task View", variable=task_view_toggle, command=task_view)
+task_menu.add_command(label="Show Tasks", command=view_tasks)
+
+# -------------------------------------------------------------------------------------------- #
+
+task_pane = ttk.Frame(window, height=20)
+task_name_label = ttk.Label(task_pane, text='Task Name:')
+task_name_label.grid(row=0, column=1, sticky='w', padx=5)
+task_name_entry = ttk.Entry(task_pane, textvariable=task_name, justify='left')
+task_name_entry.grid(row=0, column=2, sticky='w', padx=5)
+task_start_button = ttk.Button(task_pane, text='Start', command=start_task)
+task_start_button.grid(row=0, column=3, padx=5)
+task_stop_button = ttk.Button(task_pane, text='Stop', command=stop_task)
+task_stop_button.grid(row=0, column=4, padx=5)
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -980,7 +1106,7 @@ time_out_display.grid(row=4, column=3, padx=5, pady=5, sticky="ew")
 # Check box to opt for PTO instead of incrementing clock out time
 pto_check_label = ttk.Label(container_frame_3, text= "PTO", width=10, anchor='e')
 pto_check_label.grid(row=4, column=5, padx=5, pady=5, sticky="ew")
-pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=write_config)
+pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=lambda i="times": write_config(i))
 pto_check_box.grid(row=4, column=6, padx=5, pady=5, sticky="w")
 
 # # Tool tips
@@ -993,7 +1119,15 @@ tooltip = ToolTip(lunch_time_label,"Time until '"'Lunch By'"'")
 if os.path.exists(config_file_path):
     read_config()
 
-window.after(0,update(), update_time(), font_change(window), set_position(), always_on_top(), get_sounds(), create_sound_menu_entries())
+window.after(0,update(),
+             update_time(),
+             font_change(window),
+             set_position(),
+             always_on_top(),
+             get_sounds(),
+             create_sound_menu_entries(),
+             adjust_alpha(),
+             )
 
 # Run the GUI main loop
 window.mainloop()
