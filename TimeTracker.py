@@ -427,7 +427,9 @@ def message_box(title, message):
         top.destroy()
         canvas.destroy()
 
-    max_width = 400  # Set a maximum width for the message box
+    size = float(font_size.get())
+
+    max_width = round(33.33 * size)  # Set a maximum width for the message box
     padding = 20     # Padding around the message text
 
     # Create a temporary label to calculate the height needed for the message
@@ -436,7 +438,7 @@ def message_box(title, message):
     required_height = temp_label.winfo_reqheight()
 
     width = max_width
-    height = required_height + 2 * padding + 60  # Additional space for buttons and padding
+    height = required_height + 2 * padding + 60 * round(0.075*size) # Additional space for buttons and padding
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -594,17 +596,23 @@ def custom_alarm():
     canvas.update_idletasks()  # Update to ensure accurate measurements
     
     def fetch_input(event):
-        sound = get_sound_name.get()
-        sound_name.set(sound)
+        if event.keysym == 'Return':
+            # Call the on_select function
+            on_select()
+        else:
+            # Handle other key releases
+            # Your code for handling other key releases here
+            sound = get_sound_name.get()
+            sound_name.set(sound)
 
     def get_input():
         selection.set(filedialog.askopenfilename(title="Select a .wav file", filetypes=[("WAV files", "*.wav")]))
         if selection.get() != "":
             if selection.get().lower().endswith(".wav"):
-                top.geometry(f"{width}x{height+50}+{x}+{y}")
+                # top.geometry(f"{width}x{height+50}+{x}+{y}")
                 label_var.set("Name the sound: ")
                 sound_name.set(os.path.basename(selection.get()[:-4]))
-                get_sound_name.configure(width=len(sound_name.get())+5)
+                get_sound_name.configure(width= 30)
                 get_sound_name.pack()
             else:
                 label_var.set("Error: Selected file is not a .wav file.")
@@ -637,20 +645,17 @@ def custom_alarm():
             get_sounds()
             create_sound_menu_entries()
             label_var.set(value="Alarm Sound Added!")
+            frame.destroy()
         except Exception as e:
             message_box("Error", e)
             label_var.set(value=f"Error: {e}")
 
-    max_width = 400  # Set a maximum width for the message box
     padding = 20     # Padding around the message text
     
-    # Create a temporary label to calculate the height needed for the message
-    temp_label = ttk.Label(window, textvariable=label_var, wraplength=max_width - 2 * padding)
-    temp_label.update_idletasks()  # Update to ensure accurate measurements
-    required_height = temp_label.winfo_reqheight()
+    size = float(font_size.get())
 
-    width = max_width
-    height = required_height + 2 * padding + 60  # Additional space for buttons and padding
+    width = round(33.33 * size)
+    height = round(12.5 * size)
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -665,14 +670,17 @@ def custom_alarm():
     top.title("Custom Sound")
     top.geometry(f"{width}x{height}+{x}+{y}")
 
+    frame = ttk.Frame(top)
+    frame.pack(anchor='center', side='bottom')
+
     label = ttk.Label(top, textvariable=label_var, wraplength=width - 2 * padding)
     label.pack(padx=padding, pady=padding, side=TOP)
 
-    browse_button = ttk.Button(top, text="Browse", command=get_input)
-    browse_button.pack(pady=10, padx=10, side="left")
+    browse_button = ttk.Button(frame, text="Browse", command=get_input)
+    browse_button.pack(pady=10, padx=10, side='left')
 
-    select_button = ttk.Button(top, text="Select", command=on_select)
-    select_button.pack(pady=10, padx=10, side="right")
+    select_button = ttk.Button(frame, text="Select", command=on_select)
+    select_button.pack(pady=10, padx=10, side='right')
 
     get_sound_name = ttk.Entry(top, textvariable=sound_name, justify='left')
     get_sound_name.bind("<KeyRelease>", lambda event: fetch_input(event))
@@ -683,6 +691,7 @@ def custom_alarm():
 
     top.transient(window)  # Associate the messagebox with the main window
     top.grab_set()  # Make the messagebox modal
+    font_change(top)
     top.wait_window()  # Wait for the Toplevel window to be destroyed
 
 def create_sound_menu_entries():
@@ -742,9 +751,13 @@ def remove_sound(sound):
     file_path = os.path.join(sounds_folder, sound+".wav")
 
     if os.path.exists(file_path):
-        os.remove(file_path)
-        get_sounds()
-        create_sound_menu_entries()
+        try:
+            os.remove(file_path)
+            get_sounds()
+            create_sound_menu_entries()
+            message_box('Success','Sound successfully removed')
+        except Exception as e:
+            message_box('Error', e)
     else:
         print("The file does not exist")
 
@@ -752,13 +765,47 @@ def adjust_alpha():
     window.attributes("-alpha", alpha_value.get())
     write_config('menu')
 
+# Define the window zoom function
+def window_zoom(event):
+    global window_scale
+    if event.keysym == 'plus' or event.keysym == 'equal':
+        # Zoom in code here
+        current_font = font_size.get()
+        font_size.set(current_font+1)
+        font_change(window)
+        pass
+    elif event.keysym == 'minus':
+        # Zoom out code here
+        current_font = font_size.get()
+        font_size.set(current_font-1)
+        font_change(window)
+        pass
+
+def task_view():
+    print(task_view_toggle.get())
+    if task_view_toggle.get() == True:
+        task_pane.grid(row=0, sticky='w', padx=0, pady=[10,0])
+    else:
+        task_pane.grid_forget()
+
+def start_task():
+    task_name_entry.state(['readonly'])
+
+def stop_task():
+    task_name_entry.state(['!readonly'])
+
+def view_tasks():
+    task_name_entry.state(['invalid'])
+
 # Create the main window
-window = ttk.Window(resizable=[False,False], iconphoto=None)
-window.title("Time Tracker")
+window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
+window.bind("<Control-plus>", window_zoom)
+window.bind("<Control-equal>", window_zoom)
+window.bind("<Control-minus>", window_zoom)
 
 # Style
-style = Style(theme="cosmo")
+style = Style()
 
 # Create time variables with default values
 clock_in_time = tk.StringVar(value="8:00:00 AM")
@@ -785,7 +832,9 @@ custom_sound_name = tk.StringVar()
 label_var = tk.StringVar()
 selection = tk.StringVar()
 added_keys = set()
-alpha_value = tk.StringVar(value="0.9")
+alpha_value = tk.StringVar(value="0.95")
+task_view_toggle = tk.BooleanVar()
+task_name = tk.StringVar()
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -798,14 +847,13 @@ file_menu.add_command(label="Open Configuration File", command=open_config)
 file_menu.add_command(label="Open configuration File Folder", command=open_configfolder)
 file_menu.add_checkbutton(label="Window Always On Top", variable=top_var, command=always_on_top)
 file_menu.add_separator()
-# file_menu.add_command(label="Check For Updates", command=update_app)
 file_menu.add_command(label="Exit", command=window.quit)
 
 alarm_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Alarm", menu=alarm_menu)
 alarm_menu.add_command(label="Test Alarm", command=alarm_window)
 alarm_menu.add_checkbutton(label="Clock Out Alarm Toggle", variable=alarm_var, command=lambda i="menu": write_config(i))
-alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", variable=lunch_alarm_var, command=lambda i="menu": write_config(i))
+alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", indicatoron=True, variable=lunch_alarm_var, command=lambda i="menu": write_config(i))
 
 sound_menu = ttk.Menu(alarm_menu, tearoff=0)
 alarm_menu.add_cascade(label="Sounds", menu=sound_menu)
@@ -856,11 +904,13 @@ font_menu.add_radiobutton(label="14", variable=font_size, value=14, command=lamb
 font_menu.add_radiobutton(label="16", variable=font_size, value=16, command=lambda i=window: font_change(i))
 font_menu.add_radiobutton(label="18", variable=font_size, value=18, command=lambda i=window: font_change(i))
 font_menu.add_radiobutton(label="20", variable=font_size, value=20, command=lambda i=window: font_change(i))
-alpha_menu.add_radiobutton(label="0.5", variable=alpha_value, value='0.5', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.6", variable=alpha_value, value='0.6', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.7", variable=alpha_value, value='0.7', command=adjust_alpha)
 alpha_menu.add_radiobutton(label="0.8", variable=alpha_value, value='0.8', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.825", variable=alpha_value, value='0.825', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.85", variable=alpha_value, value='0.85', command=adjust_alpha)
 alpha_menu.add_radiobutton(label="0.9", variable=alpha_value, value='0.9', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.925", variable=alpha_value, value='0.925', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.95", variable=alpha_value, value='0.95', command=adjust_alpha)
+alpha_menu.add_radiobutton(label="0.975", variable=alpha_value, value='0.975', command=adjust_alpha)
 alpha_menu.add_radiobutton(label="1.0", variable=alpha_value, value='1.0', command=adjust_alpha)
 
 entries_menu = ttk.Menu(menu_bar, tearoff=0)
@@ -877,6 +927,23 @@ timers_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Timers", menu=timers_menu)
 timers_menu.add_checkbutton(label="Lunch By Timer", variable=lunch_by_timer, command=lambda i="menu": write_config(i))
 timers_menu.add_checkbutton(label="Clock Out Timer", variable=clock_out_timer, command=lambda i="menu": write_config(i))
+
+task_menu = ttk.Menu(menu_bar, tearoff=0)
+menu_bar.add_cascade(label="Tasks", menu=task_menu)
+task_menu.add_checkbutton(label="Toggle Task View", variable=task_view_toggle, command=task_view)
+task_menu.add_command(label="Show Tasks", command=view_tasks)
+
+# -------------------------------------------------------------------------------------------- #
+
+task_pane = ttk.Frame(window, height=20)
+task_name_label = ttk.Label(task_pane, text='Task Name:')
+task_name_label.grid(row=0, column=1, sticky='w', padx=5)
+task_name_entry = ttk.Entry(task_pane, textvariable=task_name, justify='left')
+task_name_entry.grid(row=0, column=2, sticky='w', padx=5)
+task_start_button = ttk.Button(task_pane, text='Start', command=start_task)
+task_start_button.grid(row=0, column=3, padx=5)
+task_stop_button = ttk.Button(task_pane, text='Stop', command=stop_task)
+task_stop_button.grid(row=0, column=4, padx=5)
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -1059,7 +1126,7 @@ window.after(0,update(),
              always_on_top(),
              get_sounds(),
              create_sound_menu_entries(),
-             adjust_alpha()
+             adjust_alpha(),
              )
 
 # Run the GUI main loop
