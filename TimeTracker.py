@@ -20,6 +20,8 @@ import shutil
 # Global Variables
 message_box_shown = False
 lunch_message_box_shown = False
+current_date = datetime.today()
+
 # sound_file_path = pathlib.Path.home() / 'Desktop' /'Projects' / 'Python' / 'TimeTracker' /'rick.wav'
 # sound_file_path = 'alarm_sounds/alarm.wav'
 
@@ -31,6 +33,10 @@ documents_path = pathlib.Path.home() / 'Documents'
 
 # Construct the path to the config.ini file
 config_file_path = documents_path / 'TimeTracker.ini'
+
+# Construct the path to the tasks folder
+task_file_path = documents_path / 'TimeTracker_Tasks'
+script_directory = os.path.dirname(os.path.abspath(__file__))
 
 def save_position():
     coordinates = [window.winfo_x(), window.winfo_y()]
@@ -430,7 +436,7 @@ def message_box(title, message):
     size = float(font_size.get())
 
     max_width = round(33.33 * size)  # Set a maximum width for the message box
-    padding = 20     # Padding around the message text
+    padding = 10 * round(0.075 * size)     # Padding around the message text
 
     # Create a temporary label to calculate the height needed for the message
     temp_label = ttk.Label(window, text=message, wraplength=max_width - 2 * padding)
@@ -438,7 +444,7 @@ def message_box(title, message):
     required_height = temp_label.winfo_reqheight()
 
     width = max_width
-    height = required_height + 2 * padding + 60 * round(0.075*size) # Additional space for buttons and padding
+    height = 2 * padding + 40 * round(0.075 * size) * (message.count('\n') + 1)
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -513,7 +519,13 @@ def update_time():
         lunch_time_label.config(text=time_left_lunch)
     else:
         lunch_time_label.config(text="")
-            
+
+    if task_timer.get():
+        time_diff = abs(datetime.strptime(current_time, "%I:%M:%S %p") - datetime.strptime(start_time.get(), "%I:%M:%S %p"))
+        task_time.set(time_diff)
+    else:
+        pass
+      
     window.after(500, update_time)
 
 def tooltip_button_clicked():
@@ -720,7 +732,6 @@ def get_sounds():
     config['Sounds'] = {}
     with open(config_file_path, 'w') as configfile: config.write(configfile)
 
-    script_directory = os.path.dirname(os.path.abspath(__file__))
     sounds_folder = os.path.join(script_directory, 'alarm_sounds')
     for file_name in os.listdir(sounds_folder):
         if file_name.endswith('.wav'):
@@ -782,20 +793,106 @@ def window_zoom(event):
         pass
 
 def task_view():
-    print(task_view_toggle.get())
+    task_name_entry.delete(0, 'end')
     if task_view_toggle.get() == True:
         task_pane.grid(row=0, sticky='w', padx=0, pady=[10,0])
     else:
         task_pane.grid_forget()
 
 def start_task():
-    task_name_entry.state(['readonly'])
+    if task_name_entry.get() != "":
+        task_name_entry.state(['!invalid'])
+        task_timer.set(True)
+        task_name_entry.state(['readonly'])
+        file_name = str(current_date).split(' ')[0]+'.txt'
+        file_location = os.path.join(task_file_path, file_name)
+        if not os.path.exists(task_file_path):
+            os.makedirs(task_file_path)
+        if not os.path.exists(os.path.join(file_location)):
+            open(file_location, "w")
+        start_time.set(format_time(time))
+        task_start_button.state(['disabled'])
+        task_stop_button.state(['!disabled'])
+    else:
+        task_name_entry.state(['invalid'])
 
 def stop_task():
+    task_start_button.state(['!disabled'])
+    task_stop_button.state(['disabled'])
     task_name_entry.state(['!readonly'])
+    task_name = task_name_entry.get()
+    file_name = str(current_date).split(' ')[0]+'.txt'
+    file_location = os.path.join(task_file_path, file_name)
+    with open(file_location, "a") as f:
+        if os.path.getsize(file_location) == 0:
+            f.write(task_name+": "+task_time.get()+": "+task_description.get())
+        else:
+            f.write("\n\n"+task_name+": "+task_time.get()+": "+task_description.get())
+    task_name_entry.delete(0, 'end')
+    task_description_entry.delete(0, 'end')
+    task_time.set('Time Logged')
+    task_pane.after(2000, lambda: task_time.set(""))
+    task_timer.set(False)
 
 def view_tasks():
-    task_name_entry.state(['invalid'])
+
+    def on_save():
+        task_entry.edit_modified(False)
+        # Get the current content of the Text widget
+        text_content = task_entry.get("1.0", "end-1c")
+        
+        # Write the text to a file (you can replace 'output.txt' with your file path)
+        with open(file_location, 'w') as file:
+            file.write(text_content)
+
+        on_close()
+
+    def on_close():
+        task_window.destroy()
+
+    file_name = str(current_date).split(' ')[0] + '.txt'
+    file_location = os.path.join(task_file_path, file_name)
+
+    task_window = tk.Toplevel()
+    task_window.title("Task View")
+
+    task_text = open(file_location, "r").read()
+
+    size = float(font_size.get())
+
+    max_width = round(33.33 * size)
+    padding = 10 * round(0.075 * size)
+
+    temp_label = ttk.Label(task_window, text=task_text, wraplength=max_width - 2 * padding)
+    temp_label.update_idletasks()
+
+    width = max_width + 2 * padding
+    height = max(2 * padding + 20 * round(0.075 * size) * (task_text.count('\n') + 1), 200)
+    
+    # Calculate the position of the message box in relation to the main window
+    x_window = window.winfo_x()
+    y_window = window.winfo_y()
+    gui_width = window.winfo_width()
+    gui_height = window.winfo_height()
+
+    x = x_window + (gui_width - width) // 2
+    y = y_window + (gui_height - height) // 2
+
+    task_window.geometry(f"{width}x{height}+{x}+{y}")
+
+    task_entry = tk.Text(task_window, wrap=tk.WORD)
+    task_entry.grid(row=0, column=0, sticky='nsew', padx=10, pady=10)
+    task_window.grid_rowconfigure(0, weight=1)  # Allow the second row (task_entry) to expand
+    task_window.grid_columnconfigure(0, weight=1)  # Allow the second row (task_entry) to expand
+
+    task_entry.insert(tk.END, task_text)
+
+    task_pane_lower = ttk.Frame(task_window)
+    task_pane_lower.grid(row=1,sticky='s', padx=10, pady=10)
+    save_button = ttk.Button(task_pane_lower, text="Save", command=on_save)
+    save_button.grid()
+    task_window.protocol("WM_DELETE_WINDOW", on_close)
+    task_window.mainloop()
 
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
@@ -835,6 +932,10 @@ added_keys = set()
 alpha_value = tk.StringVar(value="0.95")
 task_view_toggle = tk.BooleanVar()
 task_name = tk.StringVar()
+task_timer = tk.BooleanVar()
+start_time = tk.StringVar()
+task_time = tk.StringVar()
+task_description = tk.StringVar()
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -844,7 +945,7 @@ window.config(menu=menu_bar)
 file_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="Open Configuration File", command=open_config)
-file_menu.add_command(label="Open configuration File Folder", command=open_configfolder)
+file_menu.add_command(label="Open Configuration File Folder", command=open_configfolder)
 file_menu.add_checkbutton(label="Window Always On Top", variable=top_var, command=always_on_top)
 file_menu.add_separator()
 file_menu.add_command(label="Exit", command=window.quit)
@@ -938,12 +1039,18 @@ task_menu.add_command(label="Show Tasks", command=view_tasks)
 task_pane = ttk.Frame(window, height=20)
 task_name_label = ttk.Label(task_pane, text='Task Name:')
 task_name_label.grid(row=0, column=1, sticky='w', padx=5)
-task_name_entry = ttk.Entry(task_pane, textvariable=task_name, justify='left')
+task_name_entry = ttk.Entry(task_pane,textvariable=task_name, justify='left')
 task_name_entry.grid(row=0, column=2, sticky='w', padx=5)
 task_start_button = ttk.Button(task_pane, text='Start', command=start_task)
 task_start_button.grid(row=0, column=3, padx=5)
-task_stop_button = ttk.Button(task_pane, text='Stop', command=stop_task)
+task_stop_button = ttk.Button(task_pane, text='Stop', state='disabled', command=stop_task)
 task_stop_button.grid(row=0, column=4, padx=5)
+task_time_label = ttk.Label(task_pane, textvariable=task_time)
+task_time_label.grid(row=0, column=5, padx=5)
+task_description_label = ttk.Label(task_pane,text="Description:")
+task_description_label.grid(row=0, column=6, padx=5)
+task_description_entry = ttk.Entry(task_pane, textvariable=task_description, justify='left')
+task_description_entry.grid(row=0, column=7, padx=5)
 
 # -------------------------------------------------------------------------------------------- #
 
