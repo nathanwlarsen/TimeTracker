@@ -441,11 +441,11 @@ def message_box(title, message):
     temp_label = ttk.Label(window, text=message)
     temp_label.update_idletasks()  # Update to ensure accurate measurements
 
-    padding = 20
+    padding = 10
 
     # Calculate the required width and height based on the message length
-    width = temp_label.winfo_reqwidth() + padding  # Add padding
-    height = temp_label.winfo_reqheight() + 120  # Add padding and space for the OK button
+    width = temp_label.winfo_reqwidth() + 2 * padding  # Add padding
+    height = temp_label.winfo_reqheight() + 80  # Add padding and space for the OK button
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -461,10 +461,10 @@ def message_box(title, message):
     top.geometry(f"{width}x{height}+{x}+{y}")
 
     label = ttk.Label(top, text=message, wraplength=width - 2 * padding)
-    label.pack(padx=padding, pady=padding)
+    label.pack(padx=padding, pady=padding, side='top')
 
     ok_button = ttk.Button(top, text="OK", command=on_ok)
-    ok_button.pack(pady=10)
+    ok_button.pack(pady=10, side='bottom')
 
     top.focus_set()
 
