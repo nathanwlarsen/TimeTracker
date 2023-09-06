@@ -114,6 +114,13 @@ def read_config():
     except Exception as e:
         pass
 
+    file_name = str(current_date).split(' ')[0]+'.txt'
+    file_location = os.path.join(task_file_path, file_name)
+    if not os.path.exists(task_file_path):
+        os.makedirs(task_file_path)
+    if not os.path.exists(os.path.join(file_location)):
+            open(file_location, "w")
+
 # Write to config file
 def write_config(index, state=None):
     # open config file
@@ -836,16 +843,19 @@ def stop_task():
 
 def view_tasks():
 
-    def on_save():
+    def on_save(event):
         task_entry.edit_modified(False)
-        # Get the current content of the Text widget
         text_content = task_entry.get("1.0", "end-1c")
         
-        # Write the text to a file (you can replace 'output.txt' with your file path)
         with open(file_location, 'w') as file:
             file.write(text_content)
 
         on_close()
+
+    def on_clear(event):
+        with open(file_location, 'w') as file:
+            file.write('')
+        task_entry.delete("1.0", "end")
 
     def on_close():
         task_window.destroy()
@@ -889,10 +899,21 @@ def view_tasks():
 
     task_pane_lower = ttk.Frame(task_window)
     task_pane_lower.grid(row=1,sticky='s', padx=10, pady=10)
-    save_button = ttk.Button(task_pane_lower, text="Save", command=on_save)
-    save_button.grid()
+    save_button = ttk.Button(task_pane_lower, text="Save", underline=0, takefocus=False, command=on_save)
+    save_button.grid(row=0,column=1,padx=10)
+    clear_button = ttk.Button(task_pane_lower, text="Clear", underline=0, takefocus=False, command=on_clear)
+    clear_button.grid(row=0,column=0,padx=10)
+    task_window.bind("<Alt-s>", on_save)
+    task_window.bind("<Alt-c>", on_clear)
     task_window.protocol("WM_DELETE_WINDOW", on_close)
     task_window.mainloop()
+
+def open_task_folder():
+        if task_file_path:
+            try:
+                subprocess.run(["Explorer", task_file_path])
+            except Exception as e:
+                print("An error occurred:", e)
 
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
@@ -1032,7 +1053,8 @@ timers_menu.add_checkbutton(label="Clock Out Timer", variable=clock_out_timer, c
 task_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Tasks", menu=task_menu)
 task_menu.add_checkbutton(label="Toggle Task View", variable=task_view_toggle, command=task_view)
-task_menu.add_command(label="Show Tasks", command=view_tasks)
+task_menu.add_command(label="View Tasks", command=view_tasks)
+task_menu.add_command(label="Open Tasks Folder", command=open_task_folder)
 
 # -------------------------------------------------------------------------------------------- #
 
