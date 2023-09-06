@@ -98,7 +98,7 @@ def read_config():
 
     menu_keys_to_set = [
         'lunch_by_timer','clock_out_timer','alarm_var', 'lunch_alarm_var', 'top_var', 'window_mode', 
-        'selected_sound', 'font_size', 'alpha_value'
+        'selected_sound', 'font_size'
         ]
 
     for key in menu_keys_to_set:
@@ -143,15 +143,13 @@ def write_config(index, state=None):
         else:
             config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()+"|"+current_date
     elif index == 'times':
-        config['Times'] = {
-            'clock_out_time': clock_out_time.get(),
-            'lunch_by_time': lunch_by_time.get(),
-            'add_time_1': add_time_1.get(),
-            'add_time_2': add_time_2.get(),
-            'time_out': time_out.get(),
-            'pto_check': str(pto_check.get()),
-            'min_lunch': minimum_lunch.get()
-        }
+            config['Times']['clock_out_time']: clock_out_time.get()
+            config['Times']['lunch_by_time']: lunch_by_time.get()
+            config['Times']['add_time_1']: add_time_1.get()
+            config['Times']['add_time_2']: add_time_2.get()
+            config['Times']['time_out']: time_out.get()
+            config['Times']['pto_check']: str(pto_check.get())
+            config['Times']['min_lunch']: minimum_lunch.get()
     elif index == 'menu':
         config['Menu'] = {
             'alarm_var': str(alarm_var.get()),
@@ -162,7 +160,6 @@ def write_config(index, state=None):
             'lunch_by_timer': lunch_by_timer.get(),
             'clock_out_timer': clock_out_timer.get(),
             'font_size': font_size.get(),
-            'alpha_value': alpha_value.get()
         }
     elif index == 'sound':
         sound_var = custom_sound_name.get()
@@ -440,18 +437,15 @@ def message_box(title, message):
         top.destroy()
         canvas.destroy()
 
-    size = float(font_size.get())
-
-    max_width = round(33.33 * size)  # Set a maximum width for the message box
-    padding = 10 * round(0.075 * size)     # Padding around the message text
-
-    # Create a temporary label to calculate the height needed for the message
-    temp_label = ttk.Label(window, text=message, wraplength=max_width - 2 * padding)
+    # Create a temporary label to calculate the width and height needed for the message
+    temp_label = ttk.Label(window, text=message)
     temp_label.update_idletasks()  # Update to ensure accurate measurements
-    required_height = temp_label.winfo_reqheight()
 
-    width = max_width
-    height = 2 * padding + 40 * round(0.075 * size) * (message.count('\n') + 1)
+    padding = 20
+
+    # Calculate the required width and height based on the message length
+    width = temp_label.winfo_reqwidth() + padding  # Add padding
+    height = temp_label.winfo_reqheight() + 120  # Add padding and space for the OK button
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -669,12 +663,11 @@ def custom_alarm():
             message_box("Error", e)
             label_var.set(value=f"Error: {e}")
 
-    padding = 20     # Padding around the message text
-    
-    size = float(font_size.get())
+    padding = 20
 
-    width = round(33.33 * size)
-    height = round(12.5 * size)
+    # Calculate the required width and height based on the message length
+    width = 400 + padding
+    height = 160
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -777,32 +770,15 @@ def remove_sound(sound):
         except Exception as e:
             message_box('Error', e)
     else:
-        print("The file does not exist")
-
-def adjust_alpha():
-    window.attributes("-alpha", alpha_value.get())
-    write_config('menu')
-
-# Define the window zoom function
-def window_zoom(event):
-    global window_scale
-    if event.keysym == 'plus' or event.keysym == 'equal':
-        # Zoom in code here
-        current_font = font_size.get()
-        font_size.set(current_font+1)
-        font_change(window)
-        pass
-    elif event.keysym == 'minus':
-        # Zoom out code here
-        current_font = font_size.get()
-        font_size.set(current_font-1)
-        font_change(window)
-        pass
+        message_box("Error","The file does not exist")
 
 def task_view():
     task_name_entry.delete(0, 'end')
+    task_category_entry.delete(0, 'end')
+    task_description_entry.delete(0, 'end')
     if task_view_toggle.get() == True:
         task_pane.grid(row=0, sticky='w', padx=0, pady=[10,0])
+        # tab_order()
     else:
         task_pane.grid_forget()
 
@@ -827,14 +803,13 @@ def stop_task():
     task_start_button.state(['!disabled'])
     task_stop_button.state(['disabled'])
     task_name_entry.state(['!readonly'])
-    task_name = task_name_entry.get()
     file_name = str(current_date).split(' ')[0]+'.txt'
     file_location = os.path.join(task_file_path, file_name)
     with open(file_location, "a") as f:
         if os.path.getsize(file_location) == 0:
-            f.write(task_name+": "+task_time.get()+": "+task_description.get())
+            f.write(task_category.get()+": "+task_name.get()+": "+task_time.get()+": "+task_description.get())
         else:
-            f.write("\n\n"+task_name+": "+task_time.get()+": "+task_description.get())
+            f.write("\n\n"+task_category.get()+": "+task_name.get()+": "+task_time.get()+": "+task_description.get())
     task_name_entry.delete(0, 'end')
     task_description_entry.delete(0, 'end')
     task_time.set('Time Logged')
@@ -843,7 +818,7 @@ def stop_task():
 
 def view_tasks():
 
-    def on_save(event):
+    def on_save(event=None):
         task_entry.edit_modified(False)
         text_content = task_entry.get("1.0", "end-1c")
         
@@ -852,7 +827,7 @@ def view_tasks():
 
         on_close()
 
-    def on_clear(event):
+    def on_clear(event=None):
         with open(file_location, 'w') as file:
             file.write('')
         task_entry.delete("1.0", "end")
@@ -868,16 +843,13 @@ def view_tasks():
 
     task_text = open(file_location, "r").read()
 
-    size = float(font_size.get())
-
-    max_width = round(33.33 * size)
-    padding = 10 * round(0.075 * size)
-
-    temp_label = ttk.Label(task_window, text=task_text, wraplength=max_width - 2 * padding)
+    temp_label = ttk.Label(task_window, text=task_text)
     temp_label.update_idletasks()
 
-    width = max_width + 2 * padding
-    height = max(2 * padding + 20 * round(0.075 * size) * (task_text.count('\n') + 1), 200)
+    padding = 20
+
+    width = 400 + padding
+    height = max(2 * padding + 20 * (task_text.count('\n') + 1), 200)
     
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -899,9 +871,9 @@ def view_tasks():
 
     task_pane_lower = ttk.Frame(task_window)
     task_pane_lower.grid(row=1,sticky='s', padx=10, pady=10)
-    save_button = ttk.Button(task_pane_lower, text="Save", underline=0, takefocus=False, command=on_save)
+    save_button = ttk.Button(task_pane_lower, text="Save", underline=0, command=on_save)
     save_button.grid(row=0,column=1,padx=10)
-    clear_button = ttk.Button(task_pane_lower, text="Clear", underline=0, takefocus=False, command=on_clear)
+    clear_button = ttk.Button(task_pane_lower, text="Clear", underline=0, command=on_clear)
     clear_button.grid(row=0,column=0,padx=10)
     task_window.bind("<Alt-s>", on_save)
     task_window.bind("<Alt-c>", on_clear)
@@ -915,12 +887,16 @@ def open_task_folder():
             except Exception as e:
                 print("An error occurred:", e)
 
+def tab_order():
+    task_category_entry.focus()
+    widgets = [task_category_entry, task_name_entry, task_description_entry, task_start_button, task_stop_button]
+    for w in task_pane.winfo_children:
+        w.lift()
+    
+
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
-window.bind("<Control-plus>", window_zoom)
-window.bind("<Control-equal>", window_zoom)
-window.bind("<Control-minus>", window_zoom)
 
 # Style
 style = Style()
@@ -950,13 +926,13 @@ custom_sound_name = tk.StringVar()
 label_var = tk.StringVar()
 selection = tk.StringVar()
 added_keys = set()
-alpha_value = tk.StringVar(value="0.95")
 task_view_toggle = tk.BooleanVar()
 task_name = tk.StringVar()
 task_timer = tk.BooleanVar()
 start_time = tk.StringVar()
 task_time = tk.StringVar()
 task_description = tk.StringVar()
+task_category = tk.StringVar()
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -989,14 +965,10 @@ alarm_menu.add_cascade(label="Remove Sounds", menu=remove_menu)
 
 window_menu = ttk.Menu(menu_bar, tearoff=0)
 theme_menu = ttk.Menu(window_menu, tearoff=0)
-font_menu = ttk.Menu(window_menu, tearoff=0)
 light_themes = ttk.Menu(theme_menu, tearoff=0)
 dark_themes = ttk.Menu(theme_menu, tearoff=0)
-alpha_menu = ttk.Menu(window_menu, tearoff=0)
 menu_bar.add_cascade(label="Window", menu=window_menu)
 window_menu.add_cascade(label="Themes", menu=theme_menu)
-window_menu.add_cascade(label="Font Size", menu=font_menu)
-window_menu.add_cascade(label="Transparency", menu=alpha_menu)
 theme_menu.add_cascade(label="Light Themes", menu=light_themes)
 theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
@@ -1019,21 +991,6 @@ dark_themes.add_radiobutton(label="Darkly", variable=window_mode, value="darkly"
 dark_themes.add_radiobutton(label="Solar", variable=window_mode, value="solar", command=window_mode_toggle)
 dark_themes.add_radiobutton(label="Superhero", variable=window_mode, value="superhero", command=window_mode_toggle)
 dark_themes.add_radiobutton(label="Vapor", variable=window_mode, value="vapor", command=window_mode_toggle)
-font_menu.add_radiobutton(label="8", variable=font_size, value=8, command=lambda i=window: font_change(i))
-font_menu.add_radiobutton(label="10", variable=font_size, value=10, command=lambda i=window: font_change(i))
-font_menu.add_radiobutton(label="12", variable=font_size, value=12, command=lambda i=window: font_change(i))
-font_menu.add_radiobutton(label="14", variable=font_size, value=14, command=lambda i=window: font_change(i))
-font_menu.add_radiobutton(label="16", variable=font_size, value=16, command=lambda i=window: font_change(i))
-font_menu.add_radiobutton(label="18", variable=font_size, value=18, command=lambda i=window: font_change(i))
-font_menu.add_radiobutton(label="20", variable=font_size, value=20, command=lambda i=window: font_change(i))
-alpha_menu.add_radiobutton(label="0.8", variable=alpha_value, value='0.8', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.825", variable=alpha_value, value='0.825', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.85", variable=alpha_value, value='0.85', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.9", variable=alpha_value, value='0.9', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.925", variable=alpha_value, value='0.925', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.95", variable=alpha_value, value='0.95', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="0.975", variable=alpha_value, value='0.975', command=adjust_alpha)
-alpha_menu.add_radiobutton(label="1.0", variable=alpha_value, value='1.0', command=adjust_alpha)
 
 entries_menu = ttk.Menu(menu_bar, tearoff=0)
 highlight_menu = ttk.Menu(entries_menu, tearoff=0)
@@ -1058,21 +1015,38 @@ task_menu.add_command(label="Open Tasks Folder", command=open_task_folder)
 
 # -------------------------------------------------------------------------------------------- #
 
-task_pane = ttk.Frame(window, height=20)
-task_name_label = ttk.Label(task_pane, text='Task Name:')
-task_name_label.grid(row=0, column=1, sticky='w', padx=5)
-task_name_entry = ttk.Entry(task_pane,textvariable=task_name, justify='left')
-task_name_entry.grid(row=0, column=2, sticky='w', padx=5)
-task_start_button = ttk.Button(task_pane, text='Start', command=start_task)
-task_start_button.grid(row=0, column=3, padx=5)
-task_stop_button = ttk.Button(task_pane, text='Stop', state='disabled', command=stop_task)
-task_stop_button.grid(row=0, column=4, padx=5)
-task_time_label = ttk.Label(task_pane, textvariable=task_time)
-task_time_label.grid(row=0, column=5, padx=5)
-task_description_label = ttk.Label(task_pane,text="Description:")
-task_description_label.grid(row=0, column=6, padx=5)
-task_description_entry = ttk.Entry(task_pane, textvariable=task_description, justify='left')
-task_description_entry.grid(row=0, column=7, padx=5)
+task_pane = ttk.Frame(window, height=20, padding=10)
+task_pane_1 = ttk.Frame(task_pane)
+task_pane_1.grid(row=0, column=0, columnspan=99, sticky='w')
+task_pane_2 = ttk.Frame(task_pane)
+task_pane_2.grid(row=1, column=0, columnspan=99, sticky='w')
+task_pane.tk_focusPrev().focus_set()
+
+task_category_label = ttk.Label(task_pane_1, text="Category")
+task_category_label.grid(row=0, column=0, padx=5, pady=5)
+task_category_entry = ttk.Combobox(task_pane_1, state='readonly', textvariable=task_category, font=('Helvetica' ,12))
+task_category_entry['values'] = sorted(['Project','Side Task','Support','Meeting','Consultation'])
+task_category_entry.grid(row=0, column=1, padx=5, pady=5)
+
+task_name_label = ttk.Label(task_pane_1, text='Name:')
+task_name_label.grid(row=0, column=2, padx=5, pady=5)
+task_name_entry = ttk.Entry(task_pane_1,textvariable=task_name, justify='left')
+task_name_entry.grid(row=0, column=3, padx=5, pady=5)
+
+
+task_description_label = ttk.Label(task_pane_2,text="Description:")
+task_description_label.grid(row=0, column=0, padx=5, pady=5)
+task_description_entry = ttk.Entry(task_pane_2, textvariable=task_description, justify='left', width=50)
+task_description_entry.grid(row=0, column=1, padx=5, pady=5, columnspan=2, sticky='ew')
+
+task_start_button = ttk.Button(task_pane_2, text='Start', command=start_task)
+task_start_button.grid(row=0, column=3, padx=5, pady=5, sticky='w')
+
+task_stop_button = ttk.Button(task_pane_2, text='Stop', state='disabled', command=stop_task)
+task_stop_button.grid(row=0, column=4, padx=5, pady=5, sticky='w')
+
+task_time_label = ttk.Label(task_pane_2, textvariable=task_time, width=len("Time Logged"))
+task_time_label.grid(row=0, column=5, padx=5, pady=5, sticky='w')
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -1254,8 +1228,7 @@ window.after(0,update(),
              set_position(),
              always_on_top(),
              get_sounds(),
-             create_sound_menu_entries(),
-             adjust_alpha(),
+             create_sound_menu_entries()
              )
 
 # Run the GUI main loop
