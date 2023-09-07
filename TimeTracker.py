@@ -16,6 +16,10 @@ from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 from ttkbootstrap.tooltip import ToolTip
 import shutil
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Global Variables
 message_box_shown = False
@@ -807,9 +811,9 @@ def stop_task():
     file_location = os.path.join(task_file_path, file_name)
     with open(file_location, "a") as f:
         if os.path.getsize(file_location) == 0:
-            f.write(task_category.get()+": "+task_name.get()+": "+task_time.get()+": "+task_description.get())
+            f.write(task_category.get()+"|"+task_name.get()+"|"+task_time.get()+"|"+task_description.get())
         else:
-            f.write("\n\n"+task_category.get()+": "+task_name.get()+": "+task_time.get()+": "+task_description.get())
+            f.write("\n\n"+task_category.get()+"|"+task_name.get()+"|"+task_time.get()+"|"+task_description.get())
     task_name_entry.delete(0, 'end')
     task_description_entry.delete(0, 'end')
     task_time.set('Time Logged')
@@ -893,6 +897,64 @@ def tab_order():
     for w in task_pane.winfo_children:
         w.lift()
     
+def create_chart():
+    # Get ttk background and foreground colors
+    ttk_bg_color = style.lookup("TFrame", "background")
+    ttk_fg_color = style.lookup("TLabel", "foreground")
+    # plt.rcParams.update({
+    #     'fontname': 'Helvetica',
+    #     'axes.labelcolor': ttk_fg_color,  # Use ttk label text color
+    #     'axes.edgecolor': ttk_bg_color,  # Use ttk frame background color
+    #     'axes.facecolor': ttk_bg_color,  # Use ttk frame background color
+    #     'axes.facecolor': ttk_bg_color,  # Use ttk frame background color
+    #     'axes.titlecolor': ttk_fg_color,  # Use ttk label text color for titles
+    #     'xtick.color': ttk_fg_color,  # Use ttk label text color for x-axis ticks
+    #     'ytick.color': ttk_fg_color,  # Use ttk label text color for y-axis ticks
+    #     # Add more customizations as needed
+    # })
+
+    # Function to convert time in "%I:%M:%S" format to hours
+    def time_to_hours(time_str):
+        time_obj = datetime.strptime(time_str, "%H:%M:%S")
+        return time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600
+    def on_close():
+        chart_window.destroy()
+
+    # Parse the text file and create a DataFrame
+    data = []
+    file_name = str(current_date).split(' ')[0]+'.txt'
+    file_location = os.path.join(task_file_path, file_name)
+
+    with open(file_location, "r") as file:
+        for line in file:
+            category_str, task_name_str, time_spent_str, description_str = line.strip().split("|")
+            time_spent = time_to_hours(time_spent_str)
+            data.append({"Category": category_str, "TimeSpent": time_spent})
+
+    df = pd.DataFrame(data)
+
+    # Calculate the ratio of time spent as a fraction of an 8-hour workday
+    df["TimeRatio"] = df["TimeSpent"] / 8.0
+
+    # Create a new window for the chart
+    chart_window = tk.Toplevel(window)
+    chart_window.title("Chart")
+
+    # Create a bar chart using Matplotlib in the new window
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(df["Category"], df["TimeRatio"], color="skyblue")
+    ax.set_xlabel("Task Category")
+    ax.set_ylabel("Time Ratio (8-hour workday)")
+    ax.set_title("Time Spent on Task Categories")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+
+    # Embed the Matplotlib chart in a Tkinter canvas
+    canvas = FigureCanvasTkAgg(fig, master=chart_window)
+    canvas.get_tk_widget().pack()
+    chart_window.protocol("WM_DELETE_WINDOW", on_close)
+    # Show the chart in the new window
+    chart_window.mainloop()
 
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
@@ -1012,6 +1074,7 @@ menu_bar.add_cascade(label="Tasks", menu=task_menu)
 task_menu.add_checkbutton(label="Toggle Task View", variable=task_view_toggle, command=task_view)
 task_menu.add_command(label="View Tasks", command=view_tasks)
 task_menu.add_command(label="Open Tasks Folder", command=open_task_folder)
+task_menu.add_command(label="Create Chart", command=create_chart)
 
 # -------------------------------------------------------------------------------------------- #
 
