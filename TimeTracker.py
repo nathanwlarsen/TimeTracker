@@ -15,19 +15,18 @@ import ttkbootstrap as ttk
 from ttkbootstrap import Style
 from ttkbootstrap.constants import *
 from ttkbootstrap.tooltip import ToolTip
+from ttkbootstrap.dialogs import Messagebox
 import shutil
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from screeninfo import get_monitors
 
 # Global Variables
 message_box_shown = False
 lunch_message_box_shown = False
 current_date = datetime.today()
-
-# sound_file_path = pathlib.Path.home() / 'Desktop' /'Projects' / 'Python' / 'TimeTracker' /'rick.wav'
-# sound_file_path = 'alarm_sounds/alarm.wav'
 
 # Create a configparser object
 config = configparser.ConfigParser()
@@ -55,11 +54,49 @@ def set_position():
     config.read(config_file_path)
     stored_coordinates = None
 
+    def get_active_displays():
+        active_displays = []
+        
+        for monitor in get_monitors():
+            active_displays.append({
+                'name': monitor.name,
+                'width': monitor.width,
+                'height': monitor.height,
+                'x': monitor.x,
+                'y': monitor.y
+            })
+            
+        return active_displays
+
+    def valid_coordinates(saved_x, saved_y):
+        active_displays = get_active_displays()
+        
+        for display in active_displays:
+            if (
+                saved_x >= display['x'] and
+                saved_x < display['x'] + display['width'] and
+                saved_y >= display['y'] and
+                saved_y < display['y'] + display['height']
+            ):
+                return True
+        
+        return False
+
     if "WindowPosition" in config:
         stored_coordinates = (int(config["WindowPosition"]["X"]), int(config["WindowPosition"]["Y"]))
+        saved_x = stored_coordinates[0]
+        saved_y = stored_coordinates[1]
 
-        # Apply stored coordinates if the stored screen matches the current screen
-        window.geometry(f"+{stored_coordinates[0]}+{stored_coordinates[1]}")
+        if valid_coordinates(saved_x, saved_y):
+            try:
+                # Apply stored coordinates if the stored screen matches the current screen
+                window.geometry(f"+{stored_coordinates[0]}+{stored_coordinates[1]}")
+            except Exception as e:
+                print(e)
+        else:
+            center(window)
+    else:
+        center(window)
 
 # Read from config file
 def read_config():
@@ -129,6 +166,13 @@ def read_config():
 def write_config(index, state=None):
     # open config file
     config.read(config_file_path)
+
+    if not config.has_section('Times'):
+        config.add_section('Times')
+        config.set('Times', 'clock_in_time', '8:00:00 AM')
+        config.set('Times', 'clock_out_lunch_time', '12:00:00 PM')
+        config.set('Times', 'clock_in_lunch_time', '1:00:00 PM')
+
     current_date = datetime.today()
     current_date = str(current_date.date())
     if index == 'clock_in_time':
@@ -147,13 +191,13 @@ def write_config(index, state=None):
         else:
             config['Times']['clock_in_lunch_time'] = clock_in_lunch_time.get()+"|"+current_date
     elif index == 'times':
-            config['Times']['clock_out_time']: clock_out_time.get()
-            config['Times']['lunch_by_time']: lunch_by_time.get()
-            config['Times']['add_time_1']: add_time_1.get()
-            config['Times']['add_time_2']: add_time_2.get()
-            config['Times']['time_out']: time_out.get()
-            config['Times']['pto_check']: str(pto_check.get())
-            config['Times']['min_lunch']: minimum_lunch.get()
+            config['Times']['clock_out_time'] = clock_out_time.get()
+            config['Times']['lunch_by_time'] = lunch_by_time.get()
+            config['Times']['add_time_1'] = add_time_1.get()
+            config['Times']['add_time_2'] = add_time_2.get()
+            config['Times']['time_out'] = time_out.get()
+            config['Times']['pto_check'] = str(pto_check.get())
+            config['Times']['min_lunch'] = minimum_lunch.get()
     elif index == 'menu':
         config['Menu'] = {
             'alarm_var': str(alarm_var.get()),
@@ -263,10 +307,10 @@ def grab_text(index):
             update()
 
         else:
-            message_box("Warning", "Unable to find a valid time in the grabbed text.")
+            show_info("Warning", "Unable to find a valid time in the grabbed text.")
 
     except Exception as e:
-        message_box("Error", str(e))
+        show_info("Error", str(e))
 
     window.focus_set()
 
@@ -327,6 +371,7 @@ def update():
     lunch_by_time.set(format_time(lunch_time))
     clock_out_time.set(format_time(clock_out))
     time_out.set(round((time_clocked_out.seconds / 60 / 60), 2))
+    write_config('times')
 
 # Convert time variable back to string and remove leading zeros from hour
 def format_time(time):
@@ -401,7 +446,7 @@ def center(win):
     win_height = height + titlebar_height + frm_width
     x = win.winfo_screenwidth() // 2 - win_width // 2
     y = win.winfo_screenheight() // 2 - win_height // 2
-    win.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+    win.geometry('+{}+{}'.format(x, y))
     win.deiconify()
 
 def play_sound(file_path):
@@ -409,7 +454,6 @@ def play_sound(file_path):
     sound.play(loops=-1,fade_ms=1000)
 
 def alarm_window():
-    global selected_sound
     sound_file_path = f'./alarm_sounds/{selected_sound.get()}.wav'
     pygame.mixer.init()
     
@@ -418,11 +462,11 @@ def alarm_window():
     else:
         pass
 
-    response = message_box('Clock Out Reminder', 'Time to clock out!')
+    response = show_info('Clock Out Reminder', 'Time to clock out!')
     if response:
         pygame.mixer.quit()
 
-def message_box(title, message):
+def show_info(title, message):
 
     result = tk.BooleanVar()
 
@@ -441,15 +485,17 @@ def message_box(title, message):
         top.destroy()
         canvas.destroy()
 
+    if len(message) > 50:
+        width = 600
+    else:
+        width = 200
+    padding = 20
+
     # Create a temporary label to calculate the width and height needed for the message
-    temp_label = ttk.Label(window, text=message)
+    temp_label = ttk.Label(window, text=message, wraplength=width-2*padding)
     temp_label.update_idletasks()  # Update to ensure accurate measurements
 
-    padding = 10
-
-    # Calculate the required width and height based on the message length
-    width = temp_label.winfo_reqwidth() + 2 * padding  # Add padding
-    height = temp_label.winfo_reqheight() + 80  # Add padding and space for the OK button
+    height = temp_label.winfo_reqheight() + 4*padding + 32 # Account for 2 times padding for each of the two widgets
 
     # Calculate the position of the message box in relation to the main window
     x_window = window.winfo_x()
@@ -464,11 +510,11 @@ def message_box(title, message):
     top.title(title)
     top.geometry(f"{width}x{height}+{x}+{y}")
 
-    label = ttk.Label(top, text=message, wraplength=width - 2 * padding)
+    label = ttk.Label(top, text=message, wraplength=width-2*padding)
     label.pack(padx=padding, pady=padding, side='top')
 
     ok_button = ttk.Button(top, text="OK", command=on_ok)
-    ok_button.pack(pady=10, side='bottom')
+    ok_button.pack(pady=padding, padx=padding, side='bottom')
 
     top.focus_set()
 
@@ -477,7 +523,7 @@ def message_box(title, message):
     top.transient(window)  # Associate the messagebox with the main window
     top.grab_set()  # Make the messagebox modal
     top.wait_window()  # Wait for the Toplevel window to be destroyed
-
+    
     return result
 
 def update_time():
@@ -534,18 +580,15 @@ def update_time():
     window.after(500, update_time)
 
 def tooltip_button_clicked():
-    message_box('Lunch By / Minimum Lunch', 'This section is for employees who reside in California. \n\n\
-    Lunch By - The time displayed reflects the latest time you should be clocking out for lunch.\n\n\
-    Minimum Lunch - The time displayed reflects the earliest time you should be clocking in from a 30 minute lunch. \n\n\
-    If taking a 30 minute lunch - be especially mindful to clock in at a minimum of exactly 30 minutes. If you are short by even 1 second, this will result in a CAML.')
+    show_info('Lunch By / Minimum Lunch', 'This section is for employees who reside in California. \n\nLunch By - The time displayed reflects the latest time you should be clocking out for lunch.\n\nMinimum Lunch - The time displayed reflects the earliest time you should be clocking in from a 30 minute lunch. \n\nIf taking a 30 minute lunch - be especially mindful to clock in at a minimum of exactly 30 minutes. If you are short by even 1 second, this will result in a CAML.')
 
 def open_config():
     if config_file_path:
         try:
-            subprocess.run(["notepad++", config_file_path])
+            subprocess.run(["C:\\Program Files\\Notepad++\\notepad++.exe", config_file_path])
         except Exception:
             try:
-                subprocess.run(["notepad", config_file_path])  # Open with the default text editor on Windows
+                subprocess.run(["notepad.exe", config_file_path])  # Open with the default text editor on Windows
             except Exception as e:
                 print("An error occurred:", e)
 
@@ -642,7 +685,7 @@ def custom_alarm():
     
     def on_select():
         if sound_name.get() == "" or selection.get() == "":
-            message_box("Error", "You must enter a valid name.")
+            show_info("Error", "You must enter a valid name.")
             top.destroy()
             canvas.destroy()
             custom_alarm()
@@ -664,7 +707,7 @@ def custom_alarm():
             label_var.set(value="Alarm Sound Added!")
             frame.destroy()
         except Exception as e:
-            message_box("Error", e)
+            show_info("Error", e)
             label_var.set(value=f"Error: {e}")
 
     padding = 20
@@ -729,7 +772,7 @@ def file_copy(source, dest, name):
         shutil.copy(source, os.path.join(dest, name))
     else:
         invalid_path = source if not os.path.isfile(source) else dest
-        message_box("Error", f"Invalid directory: {invalid_path}")
+        show_info("Error", f"Invalid directory: {invalid_path}")
 
 def get_sounds():
     config.read(config_file_path)
@@ -743,6 +786,8 @@ def get_sounds():
             write_config('sound')
 
     sound_in_file = False
+    if selected_sound.get() == "Off":
+        return
     for item in config['Sounds'].items():
         if selected_sound.get() == item[1]:
             sound_in_file = True
@@ -754,7 +799,7 @@ def get_sounds():
 
 def remove_sound(sound):
 
-    result = message_box("Confirm", "This will also delete the file, are you sure?")
+    result = show_info("Confirm", "This will also delete the file. Are you sure?")
 
     if result.get() is True:
         pass
@@ -770,11 +815,11 @@ def remove_sound(sound):
             os.remove(file_path)
             get_sounds()
             create_sound_menu_entries()
-            message_box('Success','Sound successfully removed')
+            show_info('Success','Sound successfully removed')
         except Exception as e:
-            message_box('Error', e)
+            show_info('Error', e)
     else:
-        message_box("Error","The file does not exist")
+        show_info("Error","The file does not exist")
 
 def task_view():
     task_name_entry.delete(0, 'end')
@@ -813,7 +858,7 @@ def stop_task():
         if os.path.getsize(file_location) == 0:
             f.write(task_category.get()+"|"+task_name.get()+"|"+task_time.get()+"|"+task_description.get())
         else:
-            f.write("\n\n"+task_category.get()+"|"+task_name.get()+"|"+task_time.get()+"|"+task_description.get())
+            f.write("\n"+task_category.get()+"|"+task_name.get()+"|"+task_time.get()+"|"+task_description.get())
     task_name_entry.delete(0, 'end')
     task_description_entry.delete(0, 'end')
     task_time.set('Time Logged')
@@ -898,27 +943,13 @@ def tab_order():
         w.lift()
     
 def create_chart():
-    # Get ttk background and foreground colors
-    ttk_bg_color = style.lookup("TFrame", "background")
-    ttk_fg_color = style.lookup("TLabel", "foreground")
-    # plt.rcParams.update({
-    #     'fontname': 'Helvetica',
-    #     'axes.labelcolor': ttk_fg_color,  # Use ttk label text color
-    #     'axes.edgecolor': ttk_bg_color,  # Use ttk frame background color
-    #     'axes.facecolor': ttk_bg_color,  # Use ttk frame background color
-    #     'axes.facecolor': ttk_bg_color,  # Use ttk frame background color
-    #     'axes.titlecolor': ttk_fg_color,  # Use ttk label text color for titles
-    #     'xtick.color': ttk_fg_color,  # Use ttk label text color for x-axis ticks
-    #     'ytick.color': ttk_fg_color,  # Use ttk label text color for y-axis ticks
-    #     # Add more customizations as needed
-    # })
-
     # Function to convert time in "%I:%M:%S" format to hours
     def time_to_hours(time_str):
         time_obj = datetime.strptime(time_str, "%H:%M:%S")
         return time_obj.hour + time_obj.minute / 60 + time_obj.second / 3600
+    
     def on_close():
-        chart_window.destroy()
+        return
 
     # Parse the text file and create a DataFrame
     data = []
@@ -930,31 +961,23 @@ def create_chart():
             category_str, task_name_str, time_spent_str, description_str = line.strip().split("|")
             time_spent = time_to_hours(time_spent_str)
             data.append({"Category": category_str, "TimeSpent": time_spent})
-
+    
     df = pd.DataFrame(data)
 
     # Calculate the ratio of time spent as a fraction of an 8-hour workday
-    df["TimeRatio"] = df["TimeSpent"] / 8.0
+    df['TimeRatio'] = df['TimeSpent'] / 8.0
 
-    # Create a new window for the chart
-    chart_window = tk.Toplevel(window)
-    chart_window.title("Chart")
-
-    # Create a bar chart using Matplotlib in the new window
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(df["Category"], df["TimeRatio"], color="skyblue")
-    ax.set_xlabel("Task Category")
-    ax.set_ylabel("Time Ratio (8-hour workday)")
-    ax.set_title("Time Spent on Task Categories")
-    plt.xticks(rotation=45, ha="right")
+    # Create a bar chart using Matplotlib
+    plt.figure(figsize=(10, 6))
+    plt.bar(df['Category'], df['TimeRatio'], color='skyblue')
+    plt.xlabel('Task Category')
+    plt.ylabel('Time Ratio (8-hour workday)')
+    plt.title('Time Spent on Task Categories')
+    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
-    # Embed the Matplotlib chart in a Tkinter canvas
-    canvas = FigureCanvasTkAgg(fig, master=chart_window)
-    canvas.get_tk_widget().pack()
-    chart_window.protocol("WM_DELETE_WINDOW", on_close)
-    # Show the chart in the new window
-    chart_window.mainloop()
+    # Show the chart
+    plt.show()
 
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
@@ -972,15 +995,15 @@ lunch_by_time = tk.StringVar(value="1:00:00 PM")
 add_time_1 = tk.StringVar(value="12:00:00 PM")
 add_time_2 = tk.StringVar(value="12:00:00 PM")
 time_out = tk.StringVar(value=0.0)
-pto_check = tk.BooleanVar()
+pto_check = tk.BooleanVar(value=True)
 minimum_lunch = tk.StringVar(value="12:30:00 PM")
-alarm_var = tk.BooleanVar()
-lunch_alarm_var = tk.BooleanVar()
+alarm_var = tk.BooleanVar(value=True)
+lunch_alarm_var = tk.BooleanVar(value=True)
 top_var = tk.BooleanVar()
 selected_sound = tk.StringVar(value="rick")
 window_mode = tk.StringVar(value="cosmo")
-lunch_by_timer = tk.BooleanVar()
-clock_out_timer = tk.BooleanVar()
+lunch_by_timer = tk.BooleanVar(value=True)
+clock_out_timer = tk.BooleanVar(value=True)
 font_size = tk.IntVar(value=12)
 custom_sound = tk.StringVar()
 sound_name = tk.StringVar()
@@ -1272,14 +1295,14 @@ time_out_display.grid(row=4, column=3, padx=5, pady=5, sticky="ew")
 # Check box to opt for PTO instead of incrementing clock out time
 pto_check_label = ttk.Label(container_frame_3, text= "PTO", width=10, anchor='e')
 pto_check_label.grid(row=4, column=5, padx=5, pady=5, sticky="ew")
-pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=lambda i="times": write_config(i))
+pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=update)
 pto_check_box.grid(row=4, column=6, padx=5, pady=5, sticky="w")
 
 # # Tool tips
 tooltip = ToolTip(time_label,"Time until clock out")
-tooltip = ToolTip(lunch_time_label,"Time until '"'Lunch By'"'")
-# tooltip = Tooltip(minimum_lunch_label,"The earliest time you should be clocking in from a 30 minute lunch")
-# tooltip = Tooltip(lunch_by_label,"The latest time you should be clocking out for lunch")
+tooltip = ToolTip(lunch_by_label,"The lastest time you should be clocking out for lunch")
+tooltip = ToolTip(lunch_time_label,"Time until 'Lunch By'")
+tooltip = ToolTip(minimum_lunch_label,"The earliest time you should be clocking in from a 30 minute lunch")
 
 # Import times fromm config file, if file exists
 if os.path.exists(config_file_path):
@@ -1291,7 +1314,8 @@ window.after(0,update(),
              set_position(),
              always_on_top(),
              get_sounds(),
-             create_sound_menu_entries()
+             create_sound_menu_entries(),
+             read_config()
              )
 
 # Run the GUI main loop
