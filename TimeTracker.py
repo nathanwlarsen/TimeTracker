@@ -979,6 +979,145 @@ def create_chart():
     # Show the chart
     plt.show()
 
+def choose_theme():
+    window.rowconfigure(0, weight=1)
+    window.columnconfigure(0, weight=1)
+
+    def on_ok():
+        outer_frame.grid_forget()
+    
+    outer_frame = ttk.Frame(window)
+    outer_frame.grid(column=0, row=0, rowspan=2, sticky="nsew")
+    
+    light_themes = ttk.Frame(outer_frame, borderwidth=1, relief="solid")
+    light_themes.grid(column=0, padx=10, pady=10, ipadx=20, ipady=20, row=0, sticky="nsew")
+    
+    dark_themes = ttk.Frame(outer_frame, relief="solid")
+    dark_themes.grid(column=1, padx=10, pady=10, ipadx=20, ipady=20, row=0, sticky="nsew")
+
+    preview_frame = ttk.Frame(outer_frame)
+    preview_frame.grid(column=0, columnspan=2, padx=10, pady=10, row=1, sticky="nsew")
+    
+    button_frame = ttk.Frame(outer_frame)
+    button_frame.grid(column=0, columnspan=2, padx=10, pady=10, row=2, sticky="nsew")
+    
+    for i in range(10):
+        outer_frame.rowconfigure(i, weight=1)
+        outer_frame.columnconfigure(i, weight=1)
+        light_themes.rowconfigure(i, weight=1)
+        light_themes.columnconfigure(i, weight=1)
+        dark_themes.rowconfigure(i, weight=1)
+        dark_themes.columnconfigure(i, weight=1)
+        preview_frame.rowconfigure(i, weight=1)
+        preview_frame.columnconfigure(i, weight=1)
+        button_frame.rowconfigure(i, weight=1)
+        button_frame.columnconfigure(i, weight=1)
+
+    light_themes_label = ttk.Label(light_themes, text='Light Themes')
+    light_themes_label.grid(column=0, columnspan=4, padx=5, pady=20, row=0)
+    
+    dark_themes_label = ttk.Label(dark_themes, text='Dark Themes')
+    dark_themes_label.grid(column=0, columnspan=4, padx=5, pady=20, row=0)
+
+    Cosmo_radiobutton = ttk.Radiobutton(light_themes)
+    Cosmo_radiobutton.configure(text='Cosmo', variable=window_mode, value='cosmo', command=window_mode_toggle)
+    Cosmo_radiobutton.grid(column=0, padx=20, pady=5, row=1, sticky="w")
+
+    Morph_radiobutton = ttk.Radiobutton(light_themes)
+    Morph_radiobutton.configure(text='Morph', variable=window_mode, value='morph', command=window_mode_toggle)
+    Morph_radiobutton.grid(column=0, padx=20, pady=5, row=2, sticky="w")
+
+    Flatly_radiobutton = ttk.Radiobutton(light_themes)
+    Flatly_radiobutton.configure(text='Flatly', variable=window_mode, value='flatly', command=window_mode_toggle)
+    Flatly_radiobutton.grid(column=0, padx=20, pady=5, row=3, sticky="w")
+
+    Journal_radiobutton = ttk.Radiobutton(light_themes)
+    Journal_radiobutton.configure(text='Journal', variable=window_mode, value='journal', command=window_mode_toggle)
+    Journal_radiobutton.grid(column=0, padx=20, pady=5, row=4, sticky="w")
+
+    Litera_radiobutton = ttk.Radiobutton(light_themes)
+    Litera_radiobutton.configure(text='Litera', variable=window_mode, value='litera', command=window_mode_toggle)
+    Litera_radiobutton.grid(column=1, padx=20, pady=5, row=1, sticky="w")
+
+    Lumen_radiobutton = ttk.Radiobutton(light_themes)
+    Lumen_radiobutton.configure(text='Lumen', variable=window_mode, value='lumen', command=window_mode_toggle)
+    Lumen_radiobutton.grid(column=1, padx=20, pady=5, row=2, sticky="w")
+
+    Minty_radiobutton = ttk.Radiobutton(light_themes)
+    Minty_radiobutton.configure(text='Minty', variable=window_mode, value='minty', command=window_mode_toggle)
+    Minty_radiobutton.grid(column=1, padx=20, pady=5, row=3, sticky="w")
+
+    Pulse_radiobutton = ttk.Radiobutton(light_themes)
+    Pulse_radiobutton.configure(text='Pulse', variable=window_mode, value='pulse', command=window_mode_toggle)
+    Pulse_radiobutton.grid(column=1, padx=20, pady=5, row=4, sticky="w")
+
+    Sandstone_radiobutton = ttk.Radiobutton(light_themes)
+    Sandstone_radiobutton.configure(text='Sandstone', variable=window_mode, value='sandstone', command=window_mode_toggle)
+    Sandstone_radiobutton.grid(column=2, padx=20, pady=5, row=1, sticky="w")
+
+    United_radiobutton = ttk.Radiobutton(light_themes)
+    United_radiobutton.configure(text='United', variable=window_mode, value='united', command=window_mode_toggle)
+    United_radiobutton.grid(column=2, padx=20, pady=5, row=2, sticky="w")
+
+    Yeti_radiobutton = ttk.Radiobutton(light_themes)
+    Yeti_radiobutton.configure(text='Yeti', variable=window_mode, value='yeti', command=window_mode_toggle)
+    Yeti_radiobutton.grid(column=2, padx=20, pady=5, row=3, sticky="w")
+
+    Simplex_radiobutton = ttk.Radiobutton(light_themes)
+    Simplex_radiobutton.configure(text='Simplex', variable=window_mode, value='simplex', command=window_mode_toggle)
+    Simplex_radiobutton.grid(column=2, padx=20, pady=5, row=4, sticky="w")
+
+    Cerculean_radiobutton = ttk.Radiobutton(light_themes)
+    Cerculean_radiobutton.configure(text='Cerculean', variable=window_mode, value='cerculean', command=window_mode_toggle)
+    Cerculean_radiobutton.grid(column=3, padx=20, pady=5, row=1, sticky="w")
+
+    Cyborg_radiobutton = ttk.Radiobutton(dark_themes)
+    Cyborg_radiobutton.configure(text='Cyborg', variable=window_mode, value='cyborg', command=window_mode_toggle)
+    Cyborg_radiobutton.grid(column=0, padx=20, pady=5, row=1, sticky="w")
+
+    Darkly_radiobutton = ttk.Radiobutton(dark_themes)
+    Darkly_radiobutton.configure(text='Darkly', variable=window_mode, value='darkly', command=window_mode_toggle)
+    Darkly_radiobutton.grid(column=0, padx=20, pady=5, row=2, sticky="w")
+
+    Solar_radiobutton = ttk.Radiobutton(dark_themes)
+    Solar_radiobutton.configure(text='Solar', variable=window_mode, value='solar', command=window_mode_toggle)
+    Solar_radiobutton.grid(column=0, padx=20, pady=5, row=3, sticky="w")
+
+    Superhero_radiobutton = ttk.Radiobutton(dark_themes)
+    Superhero_radiobutton.configure(text='Superhero', variable=window_mode, value='superhero', command=window_mode_toggle)
+    Superhero_radiobutton.grid(column=0, padx=20, pady=5, row=4, sticky="w")
+
+    Vapor_radiobutton = ttk.Radiobutton(dark_themes)
+    Vapor_radiobutton.configure(text='Vapor', variable=window_mode, value='vapor', command=window_mode_toggle)
+    Vapor_radiobutton.grid(column=1, padx=20, pady=5, row=1, sticky="w")
+
+    preview_header_label = ttk.Label(preview_frame)
+    preview_header_label.configure(text='Preview')
+    preview_header_label.grid(column=0, columnspan=8, row=0)
+
+    preview_clock_in_label = ttk.Label(preview_frame)
+    preview_clock_in_label.configure(text='Clock In :')
+    preview_clock_in_label.grid(column=0, row=1)
+
+    preview_clock_in_time_display_1 = ttk.Entry(preview_frame)
+    preview_clock_in_time_display_1.configure(justify="center", state="normal", textvariable=clock_in_time, width=14, font=("Helvetica, 12"))
+    preview_clock_in_time_display_1.grid(column=1, padx=5, pady=20, row=1)
+
+    preview_clock_in_time_display_2 = ttk.Entry(preview_frame)
+    preview_clock_in_time_display_2.configure(justify="center", state="readonly", textvariable=clock_in_time, width=14, font=("Helvetica, 12"))
+    preview_clock_in_time_display_2.grid(column=2, padx=5, pady=5, row=1)
+
+    preview_clock_in_time_display_3 = ttk.Entry(preview_frame)
+    preview_clock_in_time_display_3.configure(justify="center", textvariable=clock_in_time, width=14, font=("Helvetica, 12"))
+    preview_clock_in_time_display_3.grid(column=3, padx=5, pady=5, row=1)
+    preview_clock_in_time_display_3.state(['invalid'])
+
+    preview_clock_in_button = ttk.Button(preview_frame, text='Grab Time')
+    preview_clock_in_button.grid(column=4, row=1)
+
+    ok_button = ttk.Button(button_frame, text='OK', command=on_ok)
+    ok_button.grid(column=0, row=0, pady=20)
+
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
@@ -1054,6 +1193,7 @@ light_themes = ttk.Menu(theme_menu, tearoff=0)
 dark_themes = ttk.Menu(theme_menu, tearoff=0)
 menu_bar.add_cascade(label="Window", menu=window_menu)
 window_menu.add_cascade(label="Themes", menu=theme_menu)
+window_menu.add_command(label="Choose Theme", command=choose_theme)
 theme_menu.add_cascade(label="Light Themes", menu=light_themes)
 theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
