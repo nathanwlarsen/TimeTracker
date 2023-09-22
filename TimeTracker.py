@@ -22,6 +22,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from screeninfo import get_monitors
+import ctypes as ct
 
 # Global Variables
 message_box_shown = False
@@ -138,7 +139,7 @@ def read_config():
             pass    
 
     menu_keys_to_set = [
-        'lunch_by_timer','clock_out_timer','alarm_var', 'lunch_alarm_var', 'top_var', 'window_mode', 
+        'lunch_by_timer','clock_out_timer','alarm_var', 'lunch_alarm_var', 'window_mode', 
         'selected_sound', 'font_size'
         ]
 
@@ -202,7 +203,6 @@ def write_config(index, state=None):
         config['Menu'] = {
             'alarm_var': str(alarm_var.get()),
             'lunch_alarm_var': lunch_alarm_var.get(),
-            'top_var': str(top_var.get()),
             'window_mode': window_mode.get(),
             'selected_sound': selected_sound.get(),
             'lunch_by_timer': lunch_by_timer.get(),
@@ -434,6 +434,9 @@ def handle_keypress(event, entry_id):
             update()
             write_config('times')
             window.update()
+    elif entry_id == 'readonly':
+        update()
+        update_time()
 
 # Function to center window
 def center(win):
@@ -591,20 +594,6 @@ def open_config():
                 subprocess.run(["notepad.exe", config_file_path])  # Open with the default text editor on Windows
             except Exception as e:
                 print("An error occurred:", e)
-
-def open_configfolder():
-    if documents_path:
-        try:
-            subprocess.run(["Explorer", documents_path])
-        except Exception as e:
-            print("An error occurred:", e)
-
-def always_on_top():
-    if top_var.get():
-        window.attributes("-topmost", 1)
-    else:
-        window.attributes("-topmost", 0)
-    write_config('menu')
 
 def highlight_entry(entry):
     if entry == "Clock In":
@@ -980,30 +969,37 @@ def create_chart():
     plt.show()
 
 def choose_theme():
-    window.rowconfigure(0, weight=1)
-    window.columnconfigure(0, weight=1)
+    width = 900
+    height = 450
 
-    def on_ok():
-        outer_frame.grid_forget()
+    # Calculate the position of the message box in relation to the main window
+    x_window = window.winfo_x()
+    y_window = window.winfo_y()
+    gui_width = window.winfo_width()
+    gui_height = window.winfo_height()
+
+    x = x_window + (gui_width - width) // 2
+    y = y_window + (gui_height - height) // 2
+
+    top = ttk.Toplevel(window)
+    top.title("Themes")
+    top.geometry(f"{width}x{height}+{x}+{y}")
     
-    outer_frame = ttk.Frame(window)
-    outer_frame.grid(column=0, row=0, rowspan=2, sticky="nsew")
-    
-    light_themes = ttk.Frame(outer_frame, borderwidth=1, relief="solid")
+    light_themes = ttk.Frame(top, borderwidth=1, relief="solid")
     light_themes.grid(column=0, padx=10, pady=10, ipadx=20, ipady=20, row=0, sticky="nsew")
     
-    dark_themes = ttk.Frame(outer_frame, relief="solid")
+    dark_themes = ttk.Frame(top, relief="solid")
     dark_themes.grid(column=1, padx=10, pady=10, ipadx=20, ipady=20, row=0, sticky="nsew")
 
-    preview_frame = ttk.Frame(outer_frame)
-    preview_frame.grid(column=0, columnspan=2, padx=10, pady=10, row=1, sticky="nsew")
+    preview_frame = ttk.Frame(top)
+    preview_frame.grid(column=0, columnspan=3, padx=10, pady=10, row=1, sticky="nsew")
     
-    button_frame = ttk.Frame(outer_frame)
-    button_frame.grid(column=0, columnspan=2, padx=10, pady=10, row=2, sticky="nsew")
+    button_frame = ttk.Frame(top)
+    button_frame.grid(column=0, columnspan=3, padx=10, pady=10, row=2, sticky="nsew")
     
     for i in range(10):
-        outer_frame.rowconfigure(i, weight=1)
-        outer_frame.columnconfigure(i, weight=1)
+        top.rowconfigure(i, weight=1)
+        top.columnconfigure(i, weight=1)
         light_themes.rowconfigure(i, weight=1)
         light_themes.columnconfigure(i, weight=1)
         dark_themes.rowconfigure(i, weight=1)
@@ -1019,77 +1015,101 @@ def choose_theme():
     dark_themes_label = ttk.Label(dark_themes, text='Dark Themes')
     dark_themes_label.grid(column=0, columnspan=4, padx=5, pady=20, row=0)
 
+    Ferguson_light_radiobutton = ttk.Radiobutton(light_themes)
+    Ferguson_light_radiobutton.configure(text='Ferguson Light', variable=window_mode, value='fergusonlight', command=window_mode_toggle)
+    Ferguson_light_radiobutton.grid(column=0, padx=20, pady=5, row=1, sticky="w")
+
+    Build_light_radiobutton = ttk.Radiobutton(light_themes)
+    Build_light_radiobutton.configure(text='Build Light', variable=window_mode, value='buildlight', command=window_mode_toggle)
+    Build_light_radiobutton.grid(column=0, padx=20, pady=5, row=2, sticky='w')
+
+    Teams_light_radiobutton = ttk.Radiobutton(light_themes)
+    Teams_light_radiobutton.configure(text='Teams Light', variable=window_mode, value='teamslight', command=window_mode_toggle)
+    Teams_light_radiobutton.grid(column=0, padx=20, pady=5, row=3, sticky="w")
+
     Cosmo_radiobutton = ttk.Radiobutton(light_themes)
     Cosmo_radiobutton.configure(text='Cosmo', variable=window_mode, value='cosmo', command=window_mode_toggle)
-    Cosmo_radiobutton.grid(column=0, padx=20, pady=5, row=1, sticky="w")
+    Cosmo_radiobutton.grid(column=0, padx=20, pady=5, row=4, sticky="w")
 
     Morph_radiobutton = ttk.Radiobutton(light_themes)
     Morph_radiobutton.configure(text='Morph', variable=window_mode, value='morph', command=window_mode_toggle)
-    Morph_radiobutton.grid(column=0, padx=20, pady=5, row=2, sticky="w")
+    Morph_radiobutton.grid(column=1, padx=20, pady=5, row=1, sticky="w")
 
     Flatly_radiobutton = ttk.Radiobutton(light_themes)
     Flatly_radiobutton.configure(text='Flatly', variable=window_mode, value='flatly', command=window_mode_toggle)
-    Flatly_radiobutton.grid(column=0, padx=20, pady=5, row=3, sticky="w")
+    Flatly_radiobutton.grid(column=1, padx=20, pady=5, row=2, sticky="w")
 
     Journal_radiobutton = ttk.Radiobutton(light_themes)
     Journal_radiobutton.configure(text='Journal', variable=window_mode, value='journal', command=window_mode_toggle)
-    Journal_radiobutton.grid(column=0, padx=20, pady=5, row=4, sticky="w")
+    Journal_radiobutton.grid(column=1, padx=20, pady=5, row=3, sticky="w")
 
     Litera_radiobutton = ttk.Radiobutton(light_themes)
     Litera_radiobutton.configure(text='Litera', variable=window_mode, value='litera', command=window_mode_toggle)
-    Litera_radiobutton.grid(column=1, padx=20, pady=5, row=1, sticky="w")
+    Litera_radiobutton.grid(column=1, padx=20, pady=5, row=4, sticky="w")
 
     Lumen_radiobutton = ttk.Radiobutton(light_themes)
     Lumen_radiobutton.configure(text='Lumen', variable=window_mode, value='lumen', command=window_mode_toggle)
-    Lumen_radiobutton.grid(column=1, padx=20, pady=5, row=2, sticky="w")
+    Lumen_radiobutton.grid(column=2, padx=20, pady=5, row=1, sticky="w")
 
     Minty_radiobutton = ttk.Radiobutton(light_themes)
     Minty_radiobutton.configure(text='Minty', variable=window_mode, value='minty', command=window_mode_toggle)
-    Minty_radiobutton.grid(column=1, padx=20, pady=5, row=3, sticky="w")
+    Minty_radiobutton.grid(column=2, padx=20, pady=5, row=2, sticky="w")
 
     Pulse_radiobutton = ttk.Radiobutton(light_themes)
     Pulse_radiobutton.configure(text='Pulse', variable=window_mode, value='pulse', command=window_mode_toggle)
-    Pulse_radiobutton.grid(column=1, padx=20, pady=5, row=4, sticky="w")
+    Pulse_radiobutton.grid(column=2, padx=20, pady=5, row=3, sticky="w")
 
     Sandstone_radiobutton = ttk.Radiobutton(light_themes)
     Sandstone_radiobutton.configure(text='Sandstone', variable=window_mode, value='sandstone', command=window_mode_toggle)
-    Sandstone_radiobutton.grid(column=2, padx=20, pady=5, row=1, sticky="w")
+    Sandstone_radiobutton.grid(column=2, padx=20, pady=5, row=4, sticky="w")
 
     United_radiobutton = ttk.Radiobutton(light_themes)
     United_radiobutton.configure(text='United', variable=window_mode, value='united', command=window_mode_toggle)
-    United_radiobutton.grid(column=2, padx=20, pady=5, row=2, sticky="w")
+    United_radiobutton.grid(column=3, padx=20, pady=5, row=1, sticky="w")
 
     Yeti_radiobutton = ttk.Radiobutton(light_themes)
     Yeti_radiobutton.configure(text='Yeti', variable=window_mode, value='yeti', command=window_mode_toggle)
-    Yeti_radiobutton.grid(column=2, padx=20, pady=5, row=3, sticky="w")
+    Yeti_radiobutton.grid(column=3, padx=20, pady=5, row=2, sticky="w")
 
     Simplex_radiobutton = ttk.Radiobutton(light_themes)
     Simplex_radiobutton.configure(text='Simplex', variable=window_mode, value='simplex', command=window_mode_toggle)
-    Simplex_radiobutton.grid(column=2, padx=20, pady=5, row=4, sticky="w")
+    Simplex_radiobutton.grid(column=3, padx=20, pady=5, row=3, sticky="w")
 
     Cerculean_radiobutton = ttk.Radiobutton(light_themes)
     Cerculean_radiobutton.configure(text='Cerculean', variable=window_mode, value='cerculean', command=window_mode_toggle)
-    Cerculean_radiobutton.grid(column=3, padx=20, pady=5, row=1, sticky="w")
+    Cerculean_radiobutton.grid(column=3, padx=20, pady=5, row=4, sticky="w")
+
+    Ferguson_dark_radiobutton = ttk.Radiobutton(dark_themes)
+    Ferguson_dark_radiobutton.configure(text='Ferguson Dark', variable=window_mode, value='fergusondark', command=window_mode_toggle)
+    Ferguson_dark_radiobutton.grid(column=0, padx=20, pady=5, row=1, sticky="w")
+
+    Build_dark_radiobutton = ttk.Radiobutton(dark_themes)
+    Build_dark_radiobutton.configure(text='Build Dark', variable=window_mode, value='builddark', command=window_mode_toggle)
+    Build_dark_radiobutton.grid(column=0, padx=20, pady=5, row=2, sticky="w")
+
+    Teams_dark_radiobutton = ttk.Radiobutton(dark_themes)
+    Teams_dark_radiobutton.configure(text='Teams Dark', variable=window_mode, value='teamsdark', command=window_mode_toggle)
+    Teams_dark_radiobutton.grid(column=0, padx=20, pady=5, row=3, sticky="w")
 
     Cyborg_radiobutton = ttk.Radiobutton(dark_themes)
     Cyborg_radiobutton.configure(text='Cyborg', variable=window_mode, value='cyborg', command=window_mode_toggle)
-    Cyborg_radiobutton.grid(column=0, padx=20, pady=5, row=1, sticky="w")
+    Cyborg_radiobutton.grid(column=0, padx=20, pady=5, row=4, sticky="w")
 
     Darkly_radiobutton = ttk.Radiobutton(dark_themes)
     Darkly_radiobutton.configure(text='Darkly', variable=window_mode, value='darkly', command=window_mode_toggle)
-    Darkly_radiobutton.grid(column=0, padx=20, pady=5, row=2, sticky="w")
+    Darkly_radiobutton.grid(column=1, padx=20, pady=5, row=1, sticky="w")
 
     Solar_radiobutton = ttk.Radiobutton(dark_themes)
     Solar_radiobutton.configure(text='Solar', variable=window_mode, value='solar', command=window_mode_toggle)
-    Solar_radiobutton.grid(column=0, padx=20, pady=5, row=3, sticky="w")
+    Solar_radiobutton.grid(column=1, padx=20, pady=5, row=2, sticky="w")
 
     Superhero_radiobutton = ttk.Radiobutton(dark_themes)
     Superhero_radiobutton.configure(text='Superhero', variable=window_mode, value='superhero', command=window_mode_toggle)
-    Superhero_radiobutton.grid(column=0, padx=20, pady=5, row=4, sticky="w")
+    Superhero_radiobutton.grid(column=1, padx=20, pady=5, row=3, sticky="w")
 
     Vapor_radiobutton = ttk.Radiobutton(dark_themes)
     Vapor_radiobutton.configure(text='Vapor', variable=window_mode, value='vapor', command=window_mode_toggle)
-    Vapor_radiobutton.grid(column=1, padx=20, pady=5, row=1, sticky="w")
+    Vapor_radiobutton.grid(column=1, padx=20, pady=5, row=4, sticky="w")
 
     preview_header_label = ttk.Label(preview_frame)
     preview_header_label.configure(text='Preview')
@@ -1103,20 +1123,13 @@ def choose_theme():
     preview_clock_in_time_display_1.configure(justify="center", state="normal", textvariable=clock_in_time, width=14, font=("Helvetica, 12"))
     preview_clock_in_time_display_1.grid(column=1, padx=5, pady=20, row=1)
 
-    preview_clock_in_time_display_2 = ttk.Entry(preview_frame)
-    preview_clock_in_time_display_2.configure(justify="center", state="readonly", textvariable=clock_in_time, width=14, font=("Helvetica, 12"))
-    preview_clock_in_time_display_2.grid(column=2, padx=5, pady=5, row=1)
-
     preview_clock_in_time_display_3 = ttk.Entry(preview_frame)
     preview_clock_in_time_display_3.configure(justify="center", textvariable=clock_in_time, width=14, font=("Helvetica, 12"))
-    preview_clock_in_time_display_3.grid(column=3, padx=5, pady=5, row=1)
+    preview_clock_in_time_display_3.grid(column=2, padx=5, pady=5, row=1)
     preview_clock_in_time_display_3.state(['invalid'])
 
     preview_clock_in_button = ttk.Button(preview_frame, text='Grab Time')
-    preview_clock_in_button.grid(column=4, row=1)
-
-    ok_button = ttk.Button(button_frame, text='OK', command=on_ok)
-    ok_button.grid(column=0, row=0, pady=20)
+    preview_clock_in_button.grid(column=3, row=1)
 
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
@@ -1138,7 +1151,6 @@ pto_check = tk.BooleanVar(value=True)
 minimum_lunch = tk.StringVar(value="12:30:00 PM")
 alarm_var = tk.BooleanVar(value=True)
 lunch_alarm_var = tk.BooleanVar(value=True)
-top_var = tk.BooleanVar()
 selected_sound = tk.StringVar(value="rick")
 window_mode = tk.StringVar(value="cosmo")
 lunch_by_timer = tk.BooleanVar(value=True)
@@ -1166,8 +1178,6 @@ window.config(menu=menu_bar)
 file_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="Open Configuration File", command=open_config)
-file_menu.add_command(label="Open Configuration File Folder", command=open_configfolder)
-file_menu.add_checkbutton(label="Window Always On Top", variable=top_var, command=always_on_top)
 file_menu.add_separator()
 file_menu.add_command(label="Exit", command=window.quit)
 
@@ -1199,6 +1209,8 @@ theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
 window_menu.add_command(label="Center window", command=lambda i=window: center(i))
 light_themes.add_radiobutton(label="Ferguson Light", variable=window_mode, value="fergusonlight", command=window_mode_toggle)
+light_themes.add_radiobutton(label="Build Light", variable=window_mode, value="buildlight", command=window_mode_toggle)
+light_themes.add_radiobutton(label="Teams Light", variable=window_mode, value="teamslight", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Cosmo", variable=window_mode, value="cosmo", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Morph", variable=window_mode, value="morph", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Flatly", variable=window_mode, value="flatly", command=window_mode_toggle)
@@ -1212,7 +1224,10 @@ light_themes.add_radiobutton(label="United", variable=window_mode, value="united
 light_themes.add_radiobutton(label="Yeti", variable=window_mode, value="yeti", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Simplex", variable=window_mode, value="simplex", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Cerculean", variable=window_mode, value="cerculean", command=window_mode_toggle)
+
 dark_themes.add_radiobutton(label="Ferguson Dark", variable=window_mode, value="fergusondark", command=window_mode_toggle)
+dark_themes.add_radiobutton(label="Build Dark", variable=window_mode, value="builddark", command=window_mode_toggle)
+dark_themes.add_radiobutton(label="Teams Dark", variable=window_mode, value="teamsdark", command=window_mode_toggle)
 dark_themes.add_radiobutton(label="Cyborg", variable=window_mode, value="cyborg", command=window_mode_toggle)
 dark_themes.add_radiobutton(label="Darkly", variable=window_mode, value="darkly", command=window_mode_toggle)
 dark_themes.add_radiobutton(label="Solar", variable=window_mode, value="solar", command=window_mode_toggle)
@@ -1305,7 +1320,7 @@ clock_in_label = ttk.Label(container_frame, text="Clock In :", anchor="e")
 clock_in_label.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
 
 # Clock In Display
-clock_in_time_display = ttk.Entry(container_frame, textvariable=clock_in_time, width= 14)
+clock_in_time_display = ttk.Entry(container_frame, name='clock_in_time_display', textvariable=clock_in_time, width= 14)
 clock_in_time_display.grid(row=2, column=2, padx=5, pady=5)
 clock_in_time_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "Entry 1"))
 clock_in_time_display['justify'] = "center"
@@ -1321,7 +1336,7 @@ clock_out_1_label = ttk.Label(container_frame, text="Clock Out (Lunch) :", ancho
 clock_out_1_label.grid(row=2, column=5, padx=5, pady=5, sticky="ew")
 
 # Clock Out (Lunch) Display
-clock_out_1_time_display = ttk.Entry(container_frame, textvariable=clock_out_lunch_time, width= 14)
+clock_out_1_time_display = ttk.Entry(container_frame, name='clock_out_1_time_display', textvariable=clock_out_lunch_time, width= 14)
 clock_out_1_time_display.grid(row=2, column=6, padx=5, pady=5)
 clock_out_1_time_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "Entry 2"))
 clock_out_1_time_display['justify'] = "center"
@@ -1337,7 +1352,7 @@ clock_in_2_label = ttk.Label(container_frame, text="Clock In (Lunch) :", anchor=
 clock_in_2_label.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
 # Clock In (Lunch) Display
-clock_in_2_time_display = ttk.Entry(container_frame, textvariable=clock_in_lunch_time, width= 14)
+clock_in_2_time_display = ttk.Entry(container_frame, name='clock_in_2_time_display', textvariable=clock_in_lunch_time, width= 14)
 clock_in_2_time_display.grid(row=3, column=2, padx=5, pady=5)
 clock_in_2_time_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "Entry 3"))
 clock_in_2_time_display['justify'] = "center"
@@ -1353,7 +1368,8 @@ clock_out_2_label = ttk.Label(container_frame, text="Clock Out :", anchor="e")
 clock_out_2_label.grid(row=3, column=5, padx=5, pady=5, sticky="ew")
 
 # Clock Out Display
-clock_out_2_time_display = ttk.Entry(container_frame, textvariable=clock_out_time, state='readonly', width= 14, justify='center')
+clock_out_2_time_display = ttk.Entry(container_frame, name='clock_out_2_time_display', textvariable=clock_out_time, width= 14, justify='center')
+clock_out_2_time_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "readonly"))
 clock_out_2_time_display.grid(row=3, column=6, padx=5, pady=5)
 
 # Time Til Clock Out Label
@@ -1371,7 +1387,8 @@ lunch_by_label = ttk.Label(container_frame_2, text="Lunch By :")
 lunch_by_label.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
 # Lunch By Display
-lunch_by_time_display = ttk.Entry(container_frame_2, textvariable=lunch_by_time, state='readonly', width= 14, justify='center')
+lunch_by_time_display = ttk.Entry(container_frame_2, name='lunch_by_time_display', textvariable=lunch_by_time, width= 14, justify='center')
+lunch_by_time_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "readonly"))
 lunch_by_time_display.grid(row=3, column=2, padx=5, pady=5, sticky="ew")
 
 # Time Til Clock Out For Lunch Label
@@ -1383,7 +1400,8 @@ minimum_lunch_label = ttk.Label(container_frame_2, text="Minimum Lunch :", ancho
 minimum_lunch_label.grid(row=3, column=4, padx=5, pady=5, sticky="ew")
 
 # 30 Minute Lunch Display
-minimum_lunch_display = ttk.Entry(container_frame_2, textvariable=minimum_lunch, state='readonly', width= 14, justify='center')
+minimum_lunch_display = ttk.Entry(container_frame_2, name='minimum_lunch_display', textvariable=minimum_lunch, width= 14, justify='center')
+minimum_lunch_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "readonly"))
 minimum_lunch_display.grid(row=3, column=5, padx=5, pady=5, sticky="ew")
 
 # Info button
@@ -1401,7 +1419,7 @@ add_clock_out_label = ttk.Label(container_frame_3, text="Clock Out :", anchor="e
 add_clock_out_label.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
 # Additional Time 1 Display
-add_time_1_display = ttk.Entry(container_frame_3,textvariable=add_time_1, width= 14)
+add_time_1_display = ttk.Entry(container_frame_3, name='add_time_1_display', textvariable=add_time_1, width= 14)
 add_time_1_display.grid(row=3, column=2, padx=5, pady=5)
 add_time_1_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "Entry 4"))
 add_time_1_display['justify'] = "center"
@@ -1415,7 +1433,7 @@ add_clock_in_label = ttk.Label(container_frame_3, text="Clock In :", anchor="e")
 add_clock_in_label.grid(row=3, column=5, padx=5, pady=5, sticky="ew")
 
 # Additional Time 2 Display
-add_time_2_display = ttk.Entry(container_frame_3, textvariable=add_time_2, width= 14)
+add_time_2_display = ttk.Entry(container_frame_3, name='add_time_2_display', textvariable=add_time_2, width= 14)
 add_time_2_display.grid(row=3, column=6, padx=5, pady=5)
 add_time_2_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "Entry 5"))
 add_time_2_display['justify'] = "center"
@@ -1454,7 +1472,6 @@ window.after(0,update(),
              update_time(),
              font_change(window),
              set_position(),
-             always_on_top(),
              get_sounds(),
              create_sound_menu_entries(),
              read_config()
