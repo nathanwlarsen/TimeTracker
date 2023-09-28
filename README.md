@@ -6,8 +6,8 @@ A python app created for grabbing time entries from the Workday website, using e
 # Menu
 The following items can be found in the menu bar located at the top of the app
 
-# File
-The file menu allows you to open the configuration file as well as the folder where it is contained. It also has an Window Always On Top setting that can be toggled - allowing the window to remain above other windows when clicking away from the app. The file menu also features an Exit option which will kill the app.
+## File
+The file menu features an option to open the configuration file for reviewing as well as an option to exit the app.
 
 ## Alarm
 The app features two timers: the Lunch By timer and the Clock Out timer. When there is 1 minute left on a timer, the selected alarm sound will play and a messagebox will display, informing the user it is time to begin clocking out. Alarms sounds can be added and removed from the alarm menu. Currently this only accepts .wav files. The Clock Out alarm and the Clock Out (Lunch) alarm can be toggled in this menu as well, if the user feels they are not necessary.

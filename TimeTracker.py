@@ -533,7 +533,6 @@ def update_time():
     global message_box_shown
     global lunch_message_box_shown
 
-    # sound_thread = threading.Thread(target=play_sound(sound_file_path))
     current_time = format_time(time)
     time_left = abs(datetime.strptime(clock_out_time.get(), "%I:%M:%S %p") - datetime.strptime(current_time, "%I:%M:%S %p"))
     time_left_lunch = abs(datetime.strptime(lunch_by_time.get(), "%I:%M:%S %p") - datetime.strptime(current_time, "%I:%M:%S %p"))
@@ -615,10 +614,6 @@ def window_mode_toggle():
     style.theme_use(themename=window_mode.get())
     font_change(window)
     write_config('menu')
-
-def update_app():
-
-    return
 
 def font_change(widget):
     if isinstance(widget, ttk.Entry):
@@ -1149,8 +1144,8 @@ add_time_2 = tk.StringVar(value="12:00:00 PM")
 time_out = tk.StringVar(value=0.0)
 pto_check = tk.BooleanVar(value=True)
 minimum_lunch = tk.StringVar(value="12:30:00 PM")
-alarm_var = tk.BooleanVar(value=True)
-lunch_alarm_var = tk.BooleanVar(value=True)
+alarm_var = tk.BooleanVar(value=False)
+lunch_alarm_var = tk.BooleanVar(value=False)
 selected_sound = tk.StringVar(value="rick")
 window_mode = tk.StringVar(value="cosmo")
 lunch_by_timer = tk.BooleanVar(value=True)
@@ -1203,7 +1198,7 @@ light_themes = ttk.Menu(theme_menu, tearoff=0)
 dark_themes = ttk.Menu(theme_menu, tearoff=0)
 menu_bar.add_cascade(label="Window", menu=window_menu)
 window_menu.add_cascade(label="Themes", menu=theme_menu)
-window_menu.add_command(label="Choose Theme", command=choose_theme)
+# window_menu.add_command(label="Choose Theme", command=choose_theme)
 theme_menu.add_cascade(label="Light Themes", menu=light_themes)
 theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
