@@ -1,3 +1,4 @@
 env/
 build/
 TimeTracker.spec
+dist/TimeTracker.zip
