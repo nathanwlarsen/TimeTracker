@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from screeninfo import get_monitors
 import ctypes as ct
+from win11toast import toast
 
 # Global Variables
 message_box_shown = False
@@ -41,6 +42,16 @@ config_file_path = documents_path / 'TimeTracker.ini'
 # Construct the path to the tasks folder
 task_file_path = documents_path / 'TimeTracker_Tasks'
 script_directory = os.path.dirname(os.path.abspath(__file__))
+
+def win_locked():
+    try:
+        user32 = ct.windll.User32
+        screen_lock_window = user32.GetForegroundWindow()
+        active_window_title = pygetwindow.getWindowsWithTitle(None)
+        return not any(window.handle == screen_lock_window for window in active_window_title)
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
 def save_position():
     coordinates = [window.winfo_x(), window.winfo_y()]
@@ -457,6 +468,16 @@ def play_sound(file_path):
     sound.play(loops=-1,fade_ms=1000)
 
 def alarm_window():
+    if win_locked():
+        print("Locked")
+        return
+    else:
+        print("Unlocked")
+        pass
+
+    # Un-minimize the main window
+    window.deiconify()
+
     sound_file_path = f'./alarm_sounds/{selected_sound.get()}.wav'
     pygame.mixer.init()
     
@@ -510,6 +531,7 @@ def show_info(title, message):
     y = y_window + (gui_height - height) // 2
 
     top = ttk.Toplevel(window)
+    top.lift()
     top.title(title)
     top.geometry(f"{width}x{height}+{x}+{y}")
 
@@ -525,11 +547,13 @@ def show_info(title, message):
 
     top.transient(window)  # Associate the messagebox with the main window
     top.grab_set()  # Make the messagebox modal
+    top.focus_force()
     top.wait_window()  # Wait for the Toplevel window to be destroyed
     
     return result
 
 def update_time():
+    global default_color
     global message_box_shown
     global lunch_message_box_shown
 
@@ -546,11 +570,13 @@ def update_time():
             if datetime.strptime(current_time, "%I:%M:%S %p") >= (datetime.strptime(clock_out_time.get(), "%I:%M:%S %p") - timedelta(minutes=1)):
                 if not message_box_shown:
                     message_box_shown = True
+                    default_color.set(time_label.cget('foreground'))
                     time_label.config(foreground='red')
                     if alarm_var:
                         alarm_window()
             else:
-                pass
+                print(default_color.get())
+                time_label.config(foreground=default_color.get())
         time_label.config(text=time_left)
     else:
         time_label.config(text="")
@@ -564,11 +590,15 @@ def update_time():
             if datetime.strptime(current_time, "%I:%M:%S %p") >= (datetime.strptime(lunch_by_time.get(), "%I:%M:%S %p") - timedelta(minutes=1)):
                 if not lunch_message_box_shown:
                     lunch_message_box_shown = True
+                    default_color.set(lunch_time_label.cget('foreground'))
                     lunch_time_label.config(foreground='red')
                     if lunch_alarm_var:
                         alarm_window()
             else:
-                pass
+                if lunch_time_label.cget('foreground') == 'red':
+                    time_label.config(foreground=default_color.get())
+                else:
+                    pass
         lunch_time_label.config(text=time_left_lunch)
     else:
         lunch_time_label.config(text="")
@@ -1164,6 +1194,7 @@ start_time = tk.StringVar()
 task_time = tk.StringVar()
 task_description = tk.StringVar()
 task_category = tk.StringVar()
+default_color = tk.StringVar()
 
 # -------------------------------------------------------------------------------------------- #
 
