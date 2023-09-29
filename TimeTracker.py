@@ -23,24 +23,26 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from screeninfo import get_monitors
 import ctypes as ct
+from win11toast import toast
+from pytz import timezone
+import pytz
+import webbrowser
+import threading
+import getpass
 
-# Global Variables
 message_box_shown = False
 lunch_message_box_shown = False
 current_date = datetime.today()
 
-# Create a configparser object
 config = configparser.ConfigParser()
 
-# Get the path to the user's documents folder
 documents_path = pathlib.Path.home() / 'Documents'
 
-# Construct the path to the config.ini file
 config_file_path = documents_path / 'TimeTracker.ini'
 
-# Construct the path to the tasks folder
 task_file_path = documents_path / 'TimeTracker_Tasks'
 script_directory = os.path.dirname(os.path.abspath(__file__))
+readme_file_path = os.path.join(script_directory, 'README.md')
 
 def save_position():
     coordinates = [window.winfo_x(), window.winfo_y()]
@@ -140,7 +142,7 @@ def read_config():
 
     menu_keys_to_set = [
         'lunch_by_timer','clock_out_timer','alarm_var', 'lunch_alarm_var', 'window_mode', 
-        'selected_sound', 'font_size'
+        'selected_sound', 'font_size', 'ca_toggle', 'tz_toggle', 'ae_toggle'
         ]
 
     for key in menu_keys_to_set:
@@ -153,6 +155,9 @@ def read_config():
     try:
         window_mode_value = window_mode.get()
         style.theme_use(themename=window_mode_value)
+        ca_assoc_toggle()
+        time_zone_toggle()
+        add_entries_toggle()
     except Exception as e:
         pass
 
@@ -208,6 +213,9 @@ def write_config(index, state=None):
             'lunch_by_timer': lunch_by_timer.get(),
             'clock_out_timer': clock_out_timer.get(),
             'font_size': font_size.get(),
+            'ca_toggle': ca_toggle.get(),
+            'tz_toggle': tz_toggle.get(),
+            'ae_toggle': ae_toggle.get()
         }
     elif index == 'sound':
         sound_var = custom_sound_name.get()
@@ -270,7 +278,9 @@ def grab_text(index):
         # Get the text from the clipboard
         text = pyperclip.paste()
 
-        time_window = pyautogui.getWindowsWithTitle('Time Tracker')[0]
+        pyautogui.middleClick()
+
+        time_window = pyautogui.getWindowsWithTitle('TimeTracker')[0]
         time_window.activate()
 
         # Use regex to extract the time from the grabbed text
@@ -452,23 +462,6 @@ def center(win):
     win.geometry('+{}+{}'.format(x, y))
     win.deiconify()
 
-def play_sound(file_path):
-    sound = pygame.mixer.Sound(file_path)
-    sound.play(loops=-1,fade_ms=1000)
-
-def alarm_window():
-    sound_file_path = f'./alarm_sounds/{selected_sound.get()}.wav'
-    pygame.mixer.init()
-    
-    if not pygame.mixer.music.get_busy() and not selected_sound.get() == "Off":
-        play_sound(sound_file_path)
-    else:
-        pass
-
-    response = show_info('Clock Out Reminder', 'Time to clock out!')
-    if response:
-        pygame.mixer.quit()
-
 def show_info(title, message):
 
     result = tk.BooleanVar()
@@ -510,6 +503,7 @@ def show_info(title, message):
     y = y_window + (gui_height - height) // 2
 
     top = ttk.Toplevel(window)
+    top.lift()
     top.title(title)
     top.geometry(f"{width}x{height}+{x}+{y}")
 
@@ -525,11 +519,13 @@ def show_info(title, message):
 
     top.transient(window)  # Associate the messagebox with the main window
     top.grab_set()  # Make the messagebox modal
+    top.focus_force()
     top.wait_window()  # Wait for the Toplevel window to be destroyed
     
     return result
 
 def update_time():
+    global default_color
     global message_box_shown
     global lunch_message_box_shown
 
@@ -546,11 +542,15 @@ def update_time():
             if datetime.strptime(current_time, "%I:%M:%S %p") >= (datetime.strptime(clock_out_time.get(), "%I:%M:%S %p") - timedelta(minutes=1)):
                 if not message_box_shown:
                     message_box_shown = True
+                    default_color.set(time_label.cget('foreground'))
                     time_label.config(foreground='red')
                     if alarm_var:
-                        alarm_window()
+                        toast_alarm()
             else:
-                pass
+                if time_label.cget('foreground') == 'red':
+                    time_label.config(foreground=default_color.get())
+                else:
+                    pass
         time_label.config(text=time_left)
     else:
         time_label.config(text="")
@@ -564,11 +564,15 @@ def update_time():
             if datetime.strptime(current_time, "%I:%M:%S %p") >= (datetime.strptime(lunch_by_time.get(), "%I:%M:%S %p") - timedelta(minutes=1)):
                 if not lunch_message_box_shown:
                     lunch_message_box_shown = True
+                    default_color.set(lunch_time_label.cget('foreground'))
                     lunch_time_label.config(foreground='red')
                     if lunch_alarm_var:
-                        alarm_window()
+                        toast_alarm()
             else:
-                pass
+                if lunch_time_label.cget('foreground') == 'red':
+                    lunch_time_label.config(foreground=default_color.get())
+                else:
+                    pass
         lunch_time_label.config(text=time_left_lunch)
     else:
         lunch_time_label.config(text="")
@@ -578,7 +582,7 @@ def update_time():
         task_time.set(time_diff)
     else:
         pass
-      
+    
     window.after(500, update_time)
 
 def tooltip_button_clicked():
@@ -1126,8 +1130,126 @@ def choose_theme():
     preview_clock_in_button = ttk.Button(preview_frame, text='Grab Time')
     preview_clock_in_button.grid(column=3, row=1)
 
+def ca_assoc_toggle():
+    if not ca_toggle.get():
+        alarm_menu.entryconfigure('Clock Out (Lunch) Alarm Toggle', state=DISABLED)
+        timers_menu.entryconfigure('Lunch By Timer', state=DISABLED)
+        lunch_alarm_var.set(False)
+        lunch_by_timer.set(False)
+        container_frame_2_outer.grid_forget()
+        container_frame_2.grid_forget()
+    elif ca_toggle.get():
+        alarm_menu.entryconfigure('Clock Out (Lunch) Alarm Toggle', state=NORMAL)
+        timers_menu.entryconfigure('Lunch By Timer', state=NORMAL)
+        lunch_alarm_var.set(True)
+        lunch_by_timer.set(True)
+        container_frame_2_outer.grid(row=2)
+        container_frame_2.grid(row=1)
+    write_config("menu")
+
+def convert_to_us_timezones(input_time, zone):
+    time_string = input_time
+    time_datetime = datetime.strptime(time_string, "%I:%M:%S %p")
+    today_date = datetime.today()
+    combined_datetime = datetime.combine(today_date, time_datetime.time())
+
+    # Define the Hawaii time zone
+    hawaii_timezone = pytz.timezone('Pacific/Honolulu')
+
+    if zone == 'US/Hawaii':
+        # Determine if daylight saving time is in effect for Hawaii
+        is_dst = hawaii_timezone.localize(combined_datetime).dst()
+        
+        # Adjust the time format based on DST
+        if is_dst:
+            converted_time = combined_datetime.astimezone(hawaii_timezone).strftime("%I:%M:%S %p")
+        else:
+            converted_time = combined_datetime.astimezone(hawaii_timezone).strftime("%I:%M:%S %p")
+    else:
+        # For other time zones, use the provided time zone
+        tz = pytz.timezone(zone)
+        
+        # Check if the provided zone is 'US/Mountain' and adjust for DST
+        if zone == 'US/Mountain':
+            is_dst = tz.localize(combined_datetime).dst()
+            if is_dst:
+                converted_time = combined_datetime.astimezone(tz).strftime("%I:%M:%S %p")
+            else:
+                converted_time = combined_datetime.astimezone(tz).strftime("%I:%M:%S %p")
+        else:
+            # For other time zones, don't adjust for DST
+            converted_time = combined_datetime.astimezone(tz).strftime("%I:%M:%S %p")
+
+    return converted_time
+
+def time_zone_toggle():
+    write_config('menu')
+    if tz_toggle.get() == True:
+        tz_pane.grid(row=5, sticky='nsew', padx=0, pady=[0,10])
+    else:
+        tz_pane.grid_forget()
+
+def tz_on_enter(event, label_id):
+    variables = [clock_in_time,
+    clock_out_lunch_time,
+    clock_in_lunch_time,
+    clock_out_time,
+    lunch_by_time,
+    minimum_lunch,
+    add_time_1,
+    add_time_2
+    ]
+    for variable in variables:
+        variable.set(format_time(convert_to_us_timezones(variable.get(), labels[label_id])))
+    
+def tz_on_leave(event, label_id):
+    read_config()
+
+def add_entries_toggle():
+    write_config('menu')
+    if not ae_toggle.get():
+        container_frame_3_outer.grid_forget()
+        container_frame_3.grid_forget()
+    elif ae_toggle.get():
+        container_frame_3_outer.grid(row=3)
+        container_frame_3.grid(row=1)
+
+def toast_alarm():
+    # Path to your custom sound file (in .wav format)
+    sound_file_path = f'./alarm_sounds/{selected_sound.get()}.wav'
+
+    # Define a callback function to handle click events
+    def on_notification_click(activated_args=None):
+        pygame.mixer.quit()
+
+    def play_sound():
+        pygame.mixer.init()
+        
+        if not pygame.mixer.music.get_busy() and not selected_sound.get() == "Off":
+            sound = pygame.mixer.Sound(sound_file_path)
+            sound.play(loops=-1, fade_ms=1000)
+    
+    def show_notification():
+        if selected_sound.get() == "Off":
+            toast('Time to clock out!', 'Click to silence', duration='long', on_click=on_notification_click)
+        else:
+            toast('Time to clock out!', 'Click to silence', duration='long', audio={'silent': 'true'}, on_click=on_notification_click)
+
+    # Create two threads for playing sound and showing the notification
+    sound_thread = threading.Thread(target=play_sound)
+    notification_thread = threading.Thread(target=show_notification)
+    sound_thread.daemon = True
+    notification_thread.daemon = True
+
+    # Start the threads
+    sound_thread.start()
+    notification_thread.start()
+
+def open_link(link):
+    webbrowser.open(link)
+
 # Create the main window
-window = ttk.Window(resizable=[False,False], title="Time Tracker", themename="cosmo")
+window = ttk.Window(resizable=[False,False], title="TimeTracker", themename="cosmo")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
 
 # Style
@@ -1139,11 +1261,11 @@ clock_out_lunch_time = tk.StringVar(value="12:00:00 PM")
 clock_in_lunch_time = tk.StringVar(value="1:00:00 PM")
 clock_out_time = tk.StringVar(value="5:00:00 PM")
 lunch_by_time = tk.StringVar(value="1:00:00 PM")
+minimum_lunch = tk.StringVar(value="12:30:00 PM")
 add_time_1 = tk.StringVar(value="12:00:00 PM")
 add_time_2 = tk.StringVar(value="12:00:00 PM")
 time_out = tk.StringVar(value=0.0)
 pto_check = tk.BooleanVar(value=True)
-minimum_lunch = tk.StringVar(value="12:30:00 PM")
 alarm_var = tk.BooleanVar(value=False)
 lunch_alarm_var = tk.BooleanVar(value=False)
 selected_sound = tk.StringVar(value="rick")
@@ -1164,6 +1286,11 @@ start_time = tk.StringVar()
 task_time = tk.StringVar()
 task_description = tk.StringVar()
 task_category = tk.StringVar()
+default_color = tk.StringVar()
+current_time = tk.StringVar()
+ca_toggle = tk.BooleanVar(value=False)
+ae_toggle = tk.BooleanVar(value=False)
+tz_toggle = tk.BooleanVar(value=False)
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -1178,7 +1305,8 @@ file_menu.add_command(label="Exit", command=window.quit)
 
 alarm_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Alarm", menu=alarm_menu)
-alarm_menu.add_command(label="Test Alarm", command=alarm_window)
+alarm_menu.add_command(label="Test Alarm", command=toast_alarm)
+alarm_menu.add_command(label="Silence Alarm", command=pygame.mixer.quit)
 alarm_menu.add_checkbutton(label="Clock Out Alarm Toggle", variable=alarm_var, command=lambda i="menu": write_config(i))
 alarm_menu.add_checkbutton(label="Clock Out (Lunch) Alarm Toggle", indicatoron=True, variable=lunch_alarm_var, command=lambda i="menu": write_config(i))
 
@@ -1203,6 +1331,9 @@ theme_menu.add_cascade(label="Light Themes", menu=light_themes)
 theme_menu.add_cascade(label="Dark Themes", menu=dark_themes)
 window_menu.add_command(label="Save position", command=save_position)
 window_menu.add_command(label="Center window", command=lambda i=window: center(i))
+window_menu.add_checkbutton(label="CA Associates", variable=ca_toggle, command=ca_assoc_toggle)
+window_menu.add_checkbutton(label="Additional Entries", variable=ae_toggle, command=add_entries_toggle)
+window_menu.add_checkbutton(label="Time Zones", variable=tz_toggle, command=time_zone_toggle)
 light_themes.add_radiobutton(label="Ferguson Light", variable=window_mode, value="fergusonlight", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Build Light", variable=window_mode, value="buildlight", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Teams Light", variable=window_mode, value="teamslight", command=window_mode_toggle)
@@ -1251,6 +1382,10 @@ task_menu.add_command(label="View Tasks", command=view_tasks)
 task_menu.add_command(label="Open Tasks Folder", command=open_task_folder)
 task_menu.add_command(label="Create Chart", command=create_chart)
 
+help_menu = ttk.Menu(menu_bar, tearoff=0)
+menu_bar.add_cascade(label="Help", menu=help_menu)
+help_menu.add_command(label="Open SharePoint SOP", command= lambda i="https://mydigitalspace.sharepoint.com/sites/BwFDataTraining/SitePages/Time-Tracker.aspx": open_link(i))
+
 # -------------------------------------------------------------------------------------------- #
 
 task_pane = ttk.Frame(window, height=20, padding=10)
@@ -1271,7 +1406,6 @@ task_name_label.grid(row=0, column=2, padx=5, pady=5)
 task_name_entry = ttk.Entry(task_pane_1,textvariable=task_name, justify='left')
 task_name_entry.grid(row=0, column=3, padx=5, pady=5)
 
-
 task_description_label = ttk.Label(task_pane_2,text="Description:")
 task_description_label.grid(row=0, column=0, padx=5, pady=5)
 task_description_entry = ttk.Entry(task_pane_2, textvariable=task_description, justify='left', width=50)
@@ -1288,10 +1422,36 @@ task_time_label.grid(row=0, column=5, padx=5, pady=5, sticky='w')
 
 # -------------------------------------------------------------------------------------------- #
 
+# -------------------------------------------------------------------------------------------- #
+
+tz_pane = ttk.Frame(window, height=20, padding=10)
+for i in range(7):
+    tz_pane.grid_columnconfigure(i, weight=1)
+
+labels = ['US/Hawaii', 'US/Alaska', 'US/Pacific', 'US/Arizona', 'US/Mountain', 'US/Central', 'US/Eastern', 'UTC']
+
+label_widgets = []
+
+# Create three labels with different IDs
+for i, label_text in enumerate(labels):
+    label = ttk.Label(tz_pane, text=label_text, font=("Helvetica", font_size.get()), relief="solid", borderwidth=1, padding=10)
+    label.grid(row=1, column=i)
+    label_widgets.append(label)
+
+# Bind events for each label with their respective IDs
+for i, label in enumerate(label_widgets):
+    label.bind("<Enter>", lambda event, label_id=i: tz_on_enter(event, label_id))
+    label.bind("<Leave>", lambda event, label_id=i: tz_on_leave(event, label_id))
+
+# -------------------------------------------------------------------------------------------- #
+
 outer_frame = ttk.Frame(window, padding=10)
 outer_frame.grid(row=1)
 
-container_frame = ttk.Frame(outer_frame, padding=10, relief="solid", borderwidth=1)
+container_frame_1_outer = ttk.Frame(outer_frame, padding=10)
+container_frame_1_outer.grid(row=1)
+
+container_frame = ttk.Frame(container_frame_1_outer, padding=10, relief="solid", borderwidth=1)
 container_frame.grid(row=1)
 
 container_frame_2_outer = ttk.Frame(outer_frame, padding=10)
@@ -1300,8 +1460,11 @@ container_frame_2_outer.grid(row=2)
 container_frame_2 = ttk.Frame(container_frame_2_outer, padding=10, relief="solid", borderwidth=1)
 container_frame_2.grid(row=1)
 
-container_frame_3 = ttk.Frame(outer_frame, padding=10, relief="solid", borderwidth=1)
-container_frame_3.grid(row=3)
+container_frame_3_outer = ttk.Frame(outer_frame, padding=10)
+container_frame_3_outer.grid(row=3)
+
+container_frame_3 = ttk.Frame(container_frame_3_outer, padding=10, relief="solid", borderwidth=1)
+container_frame_3.grid(row=1)
 
 # Create labels and buttons for standard time clock entries
 # -------------------------------------------------------------------------------------------- #
@@ -1315,7 +1478,7 @@ clock_in_label = ttk.Label(container_frame, text="Clock In :", anchor="e")
 clock_in_label.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
 
 # Clock In Display
-clock_in_time_display = ttk.Entry(container_frame, name='clock_in_time_display', textvariable=clock_in_time, width= 14)
+clock_in_time_display = ttk.Entry(container_frame, name='clock_in_time_display', textvariable=clock_in_time, width=14)
 clock_in_time_display.grid(row=2, column=2, padx=5, pady=5)
 clock_in_time_display.bind("<KeyRelease>", lambda event: handle_keypress(event, "Entry 1"))
 clock_in_time_display['justify'] = "center"
@@ -1454,22 +1617,23 @@ pto_check_box = ttk.Checkbutton(container_frame_3, variable=pto_check, command=u
 pto_check_box.grid(row=4, column=6, padx=5, pady=5, sticky="w")
 
 # # Tool tips
-tooltip = ToolTip(time_label,"Time until clock out")
-tooltip = ToolTip(lunch_by_label,"The lastest time you should be clocking out for lunch")
-tooltip = ToolTip(lunch_time_label,"Time until 'Lunch By'")
-tooltip = ToolTip(minimum_lunch_label,"The earliest time you should be clocking in from a 30 minute lunch")
+time_label_tooltip = ToolTip(time_label,"Time until clock out")
+lunch_by_label_tooltip = ToolTip(lunch_by_label,"The latest time you should be clocking out for lunch")
+lunch_time_lablel_tooltip = ToolTip(lunch_time_label,"Time until 'Lunch By'")
+minimum_lunch_label_tooltip = ToolTip(minimum_lunch_label,"The earliest time you should be clocking in from a 30 minute lunch")
 
 # Import times fromm config file, if file exists
 if os.path.exists(config_file_path):
     read_config()
 
-window.after(0,update(),
+window.after(0,
+             read_config(),
+             update(),
              update_time(),
              font_change(window),
              set_position(),
              get_sounds(),
-             create_sound_menu_entries(),
-             read_config()
+             create_sound_menu_entries()
              )
 
 # Run the GUI main loop
