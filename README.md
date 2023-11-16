@@ -1,4 +1,4 @@
-![image](https://github.com/nathanwlarsen/TimeTracker/blob/master/2023-10-20%2009_58_17-TimeTracker.png)
+![image](https://github.com/nathanwlarsen/TimeTracker/blob/master/2023-11-16%2008_00_28-TimeTracker.png)
 
 # TimeTracker
 A python app created for grabbing time entries from the Workday website, using either the Chrome or Microsoft Edge browser. The app will calculate Lunch By, Minimum Lunch, and Clock Out times as each time is updated. Lunch By and Minimum Lunch times are based on the California meal break laws - displaying these times ensures that employees are adhering to these meal break requirements.
