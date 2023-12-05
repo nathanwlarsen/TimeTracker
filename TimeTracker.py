@@ -9,6 +9,7 @@ import pathlib
 import configparser
 import os
 import time
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 import subprocess
 import ttkbootstrap as ttk
@@ -28,7 +29,13 @@ from pytz import timezone
 import pytz
 import webbrowser
 import threading
-import getpass
+import sys
+from tendo import singleton
+
+try:
+    me = singleton.SingleInstance()
+except singleton.SingleInstanceException:
+    sys.exit(-1)
 
 message_box_shown = False
 lunch_message_box_shown = False
@@ -393,13 +400,18 @@ def format_time(time):
         time_str = time
 
     # Remove leading zeros from the hour component
-    time_parts = time_str.split(':')
-    hour = str(int(time_parts[0])).strip()
+    try:
+        time_parts = time_str.split(':')
+        hour = str(int(time_parts[0])).strip()
 
-    # Construct the updated time string
-    updated_time_str = f"{hour}:{time_parts[1]}:{time_parts[2]}"
+        # Construct the updated time string
+        updated_time_str = f"{hour}:{time_parts[1]}:{time_parts[2]}"
 
-    return updated_time_str
+        return updated_time_str
+    except:
+        return time_str
+        
+    
 
 # Function to update clock out and lunch by when manual time is entered
 def handle_keypress(event, entry_id):
@@ -1248,6 +1260,40 @@ def toast_alarm():
 def open_link(link):
     webbrowser.open(link)
 
+def calc_view():
+    if calc_view_toggle.get() == True:
+        calc_pane.grid(row=0, sticky='w', padx=0, pady=[10,0])
+    else:
+        calc_pane.grid_forget()
+    calculate_clock_in_time()
+
+def calculate_clock_in_time():
+    # Parse clock-out time
+    clock_out_time = datetime.strptime(calc_clock_out.get(), "%I:%M:%S %p")
+
+    # Parse lunch break duration into hours and minutes
+    lunch_hours, lunch_minutes = map(int, calc_lunch_break.get().split(':'))
+    lunch_break_duration = timedelta(hours=lunch_hours, minutes=lunch_minutes)
+
+    # Calculate clock-in time by subtracting lunch break duration from clock-out time
+    clock_in_time = clock_out_time - (timedelta(hours=8) + lunch_break_duration)
+
+    calc_time.set("Clock in at: " + format_time(clock_in_time)) # Return clock-in time in HH:MM format
+
+def handle_calc_keypress(event, entry_id):
+    # Function to be called when any key is pressed
+    # Use regex to extract the time from the grabbed text
+    # Update the corresponding time based on the button index
+    if entry_id == "clock out time":
+        time = calc_clock_out.get().strip()
+        if re.match(r"\d{1,2}:\d{2}:\d{2} [APM]+",time):
+            calc_clock_out.set(format_time(time))
+            calculate_clock_in_time()
+    elif entry_id == "lunch break":
+        time = calc_lunch_break.get().strip()
+        if re.match(r"\d{1,2}:\d{2}", time):
+            calculate_clock_in_time()
+
 # Create the main window
 window = ttk.Window(resizable=[False,False], title="TimeTracker", themename="cosmo")
 window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
@@ -1256,6 +1302,10 @@ window.bind_all("<Button-1>", lambda event: event.widget.focus_set())
 style = Style()
 
 # Create time variables with default values
+calc_view_toggle = tk.BooleanVar()
+calc_clock_out = tk.StringVar(value="5:00:00 PM")
+calc_lunch_break = tk.StringVar(value="1:00")
+calc_time = tk.StringVar()
 clock_in_time = tk.StringVar(value="8:00:00 AM")
 clock_out_lunch_time = tk.StringVar(value="12:00:00 PM")
 clock_in_lunch_time = tk.StringVar(value="1:00:00 PM")
@@ -1334,6 +1384,7 @@ window_menu.add_command(label="Center window", command=lambda i=window: center(i
 window_menu.add_checkbutton(label="CA Associates", variable=ca_toggle, command=ca_assoc_toggle)
 window_menu.add_checkbutton(label="Additional Entries", variable=ae_toggle, command=add_entries_toggle)
 window_menu.add_checkbutton(label="Time Zones", variable=tz_toggle, command=time_zone_toggle)
+window_menu.add_checkbutton(label="Clock In Time Calculator", variable=calc_view_toggle, command=calc_view)
 light_themes.add_radiobutton(label="Ferguson Light", variable=window_mode, value="fergusonlight", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Build Light", variable=window_mode, value="buildlight", command=window_mode_toggle)
 light_themes.add_radiobutton(label="Teams Light", variable=window_mode, value="teamslight", command=window_mode_toggle)
@@ -1384,7 +1435,7 @@ task_menu.add_command(label="Create Chart", command=create_chart)
 
 help_menu = ttk.Menu(menu_bar, tearoff=0)
 menu_bar.add_cascade(label="Help", menu=help_menu)
-help_menu.add_command(label="Open SharePoint SOP", command= lambda i="https://mydigitalspace.sharepoint.com/sites/BwFDataTraining/SitePages/Time-Tracker.aspx": open_link(i))
+help_menu.add_command(label="Open SharePoint SOP", command=lambda i="https://mydigitalspace.sharepoint.com/sites/BwFDataTraining/SitePages/Time-Tracker.aspx": open_link(i))
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -1421,6 +1472,26 @@ task_time_label = ttk.Label(task_pane_2, textvariable=task_time, width=len("Time
 task_time_label.grid(row=0, column=5, padx=5, pady=5, sticky='w')
 
 # -------------------------------------------------------------------------------------------- #
+
+calc_pane = ttk.Frame(window, height=20, padding=10)
+calc_pane_1 = ttk.Frame(calc_pane)
+calc_pane_1.grid(row=0, column=0, columnspan=99, sticky='w')
+calc_pane.tk_focusPrev().focus_set()
+
+calc_clock_out_time_label = ttk.Label(calc_pane_1, text="Clock Out Time: ")
+calc_clock_out_time_label.grid(row=0, column=0, padx=5, pady=5)
+calc_clock_out_time_entry = ttk.Entry(calc_pane_1, textvariable=calc_clock_out, font=('Helvetica' ,12), width=14)
+calc_clock_out_time_entry.grid(row=0, column=1, padx=5, pady=5)
+calc_clock_out_time_entry.bind("<KeyRelease>", lambda event: handle_calc_keypress(event, "clock out time"))
+
+calc_lunch_break_label = ttk.Label(calc_pane_1, text='Lunch Break: ')
+calc_lunch_break_label.grid(row=0, column=2, padx=5, pady=5)
+calc_lunch_break_entry = ttk.Entry(calc_pane_1,textvariable=calc_lunch_break, justify='left', width=14)
+calc_lunch_break_entry.grid(row=0, column=3, padx=5, pady=5)
+calc_lunch_break_entry.bind("<KeyRelease>", lambda event: handle_calc_keypress(event, "lunch break"))
+
+calc_time_label = ttk.Label(calc_pane_1, textvariable=calc_time, width=len("Clock in at: 8:00:00 AM"))
+calc_time_label.grid(row=0, column=5, padx=5, pady=5, sticky='w')
 
 # -------------------------------------------------------------------------------------------- #
 
@@ -1633,7 +1704,8 @@ window.after(0,
              font_change(window),
              set_position(),
              get_sounds(),
-             create_sound_menu_entries()
+             create_sound_menu_entries(),
+             calculate_clock_in_time()
              )
 
 # Run the GUI main loop
